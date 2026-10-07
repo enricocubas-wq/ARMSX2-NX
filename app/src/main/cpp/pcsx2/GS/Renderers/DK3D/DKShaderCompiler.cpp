@@ -13,6 +13,7 @@
 #include "common/Console.h"
 #include "common/FileSystem.h"
 #include "common/Path.h"
+#include "common/Threading.h"
 #include "common/Timer.h"
 
 #include <condition_variable>
@@ -324,6 +325,8 @@ namespace
 
 	void WorkerThread()
 	{
+		Threading::SetNameOfCurrentThread("DK3D Shader Compiler");
+
 		std::unique_lock<std::mutex> guard(s_state.lock);
 		for (;;)
 		{

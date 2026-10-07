@@ -16,4 +16,7 @@ namespace HorizonHost
 	// Set by Host::RequestExitApplication / Host::RequestExitBigPicture and the quit combo
 	void RequestExit();
 	bool IsExitRequested();
+
+	// Enables the periodic "[PERF]" line in the log (speed, per-thread load, fault counters).
+	void SetPerfLogEnabled(bool enabled);
 } // namespace HorizonHost

@@ -16,6 +16,7 @@
 #include "common/Console.h"
 #include "common/Error.h"
 #include "common/Horizon/Horizon.h"
+#include "common/Threading.h"
 
 #include <array>
 #include <atomic>
@@ -73,6 +74,8 @@ void HorizonAudioStream::FillBuffer(AudioOutBuffer& buf)
 
 void HorizonAudioStream::ThreadEntry()
 {
+	Threading::SetNameOfCurrentThread("Audio");
+
 	// Prime and queue all buffers before first completion.
 	for (AudioOutBuffer& buf : m_buffers)
 	{

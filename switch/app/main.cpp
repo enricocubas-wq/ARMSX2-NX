@@ -28,6 +28,8 @@
 #include <vector>
 
 #include "common/Horizon/Horizon.h"
+#include "common/Horizon/HorizonTuning.h"
+#include "common/Threading.h"
 
 #include "HorizonHost.h"
 #include "HorizonUsbStorage.h"
@@ -39,6 +41,7 @@ namespace
 	constexpr const char* LOGS_DIR = "sdmc:/switch/armsx2/logs";
 	constexpr const char* LOG_PATH = "sdmc:/switch/armsx2/logs/emulog.txt";
 	constexpr const char* USB_SETTINGS_SECTION = "Horizon";
+	constexpr const char* TUNING_SETTINGS_SECTION = "Horizon";
 	constexpr const char* USB_GAME_ROOTS_KEY = "ManagedUsbGameRoots";
 
 	constexpr u64 INPUT_POLL_NS = 16'000'000ULL;
@@ -183,6 +186,36 @@ namespace
 		EmuFolders::EnsureFoldersExist();
 	}
 
+	// Optional Switch-specific tweaks (see common/Horizon/HorizonTuning.h). Each one has a key in
+	// the [Horizon] section of armsx2.ini; the key is written out on first run so it can be
+	// found and flipped on the SD card without rebuilding.
+	bool GetTuningToggle(const char* key, bool default_value, bool* dirty)
+	{
+		if (!s_settings_interface->ContainsValue(TUNING_SETTINGS_SECTION, key))
+		{
+			s_settings_interface->SetBoolValue(TUNING_SETTINGS_SECTION, key, default_value);
+			*dirty = true;
+		}
+		return s_settings_interface->GetBoolValue(TUNING_SETTINGS_SECTION, key, default_value);
+	}
+
+	void SetupHorizonTuning()
+	{
+		bool dirty = false;
+		const bool thread_tuning = GetTuningToggle("ThreadTuning", true, &dirty);
+		const bool code_page_read_backpatch = GetTuningToggle("CodePageReadBackpatch", true, &dirty);
+		const bool perf_log = GetTuningToggle("PerfLog", true, &dirty);
+		if (dirty)
+			s_settings_interface->Save();
+
+		// Must run on the main thread before any emulation thread exists.
+		Horizon::InitThreadTuning(thread_tuning);
+		Horizon::SetCodePageReadBackpatchEnabled(code_page_read_backpatch);
+		HorizonHost::SetPerfLogEnabled(perf_log);
+		INFO_LOG("Horizon tuning: ThreadTuning={} CodePageReadBackpatch={} PerfLog={}", thread_tuning,
+			code_page_read_backpatch, perf_log);
+	}
+
 	bool SyncUsbGameRoots()
 	{
 		std::vector<std::string> roots;
@@ -271,6 +304,7 @@ int main(int argc, char** argv)
 		EmuFolders::SetResourcesDirectory();
 	INFO_LOG("Resources directory: {}", EmuFolders::Resources);
 	SetupSettings();
+	SetupHorizonTuning();
 	if (HorizonUsbStorage::Initialize())
 	{
 		SyncUsbGameRoots();
@@ -346,6 +380,8 @@ int main(int argc, char** argv)
 
 	std::atomic_bool stop_loop{false};
 	std::thread input_thread([&]() {
+		Threading::SetNameOfCurrentThread("Input");
+
 		std::array<u64, NUM_LOCAL_PLAYERS> prev_held{};
 		bool prev_menu_combo = false;
 		while (!stop_loop.load(std::memory_order_relaxed))

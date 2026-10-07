@@ -10,6 +10,7 @@
 #include "common/Assertions.h"
 #include "common/Console.h"
 #include "common/Horizon/Horizon.h"
+#include "common/Horizon/HorizonTuning.h"
 
 #include <memory>
 #include <mutex>
@@ -308,5 +309,7 @@ Threading::ThreadHandle& Threading::Thread::operator=(Thread&& thread)
 
 void Threading::SetNameOfCurrentThread(const char* name)
 {
-	(void)name;
+	// Horizon has no thread names, but every long-lived thread announces itself here right after
+	// it starts, which makes it the one place to decide where that thread should run.
+	Horizon::ApplyThreadPolicy(name);
 }

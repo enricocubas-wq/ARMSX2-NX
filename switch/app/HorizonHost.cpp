@@ -7,7 +7,9 @@
 #include "common/Console.h"
 #include "common/Error.h"
 #include "common/Horizon/Horizon.h"
+#include "common/Horizon/HorizonTuning.h"
 #include "common/ProgressCallback.h"
+#include "common/Threading.h"
 #include "common/WindowInfo.h"
 
 #include "pcsx2/Achievements.h"
@@ -19,6 +21,7 @@
 #include "pcsx2/ImGui/ImGuiManager.h"
 #include "pcsx2/Input/InputManager.h"
 #include "pcsx2/MTGS.h"
+#include "pcsx2/PerformanceMetrics.h"
 #include "pcsx2/VMManager.h"
 
 #include "HorizonHost.h"
@@ -46,6 +49,48 @@ namespace
 	std::thread::id s_cpu_thread_id;
 	std::atomic_bool s_cpu_thread_valid{false};
 	std::atomic_bool s_exit_requested{false};
+	std::atomic_bool s_perf_log_enabled{false};
+
+	// PerformanceMetrics refreshes every 0.5s; one log line summarises this many refreshes.
+	constexpr u32 PERF_LOG_SAMPLES = 10;
+
+	struct PerfLogAccumulator
+	{
+		u32 samples = 0;
+		float speed_sum = 0.0f;
+		float speed_min = 0.0f;
+		float fps_sum = 0.0f;
+		float ee_sum = 0.0f;
+		float gs_sum = 0.0f;
+		float vu_sum = 0.0f;
+		float gpu_sum = 0.0f;
+		float stall_vu_sum = 0.0f;
+		float stall_gs_sum = 0.0f;
+		float stall_vsync_sum = 0.0f;
+		float gs_gpu_wait_sum = 0.0f;
+		float gs_idle_sum = 0.0f;
+		std::array<u32, 6> limiter_counts{};
+
+		// Fault counters at the previous line, to report deltas.
+		u64 last_lazy = 0;
+		u64 last_limit = 0;
+		u64 last_prot_reads = 0;
+		u64 last_prot_read_bp = 0;
+		u64 last_prot_writes = 0;
+		u64 last_backpatches = 0;
+		u64 last_unhandled = 0;
+	};
+	PerfLogAccumulator s_perf_log;
+
+	void ResetPerfLogSamples()
+	{
+		s_perf_log.samples = 0;
+		s_perf_log.speed_sum = s_perf_log.speed_min = s_perf_log.fps_sum = 0.0f;
+		s_perf_log.ee_sum = s_perf_log.gs_sum = s_perf_log.vu_sum = s_perf_log.gpu_sum = 0.0f;
+		s_perf_log.stall_vu_sum = s_perf_log.stall_gs_sum = s_perf_log.stall_vsync_sum = 0.0f;
+		s_perf_log.gs_gpu_wait_sum = s_perf_log.gs_idle_sum = 0.0f;
+		s_perf_log.limiter_counts.fill(0);
+	}
 
 	std::mutex s_gamelist_refresh_mutex;
 	std::thread s_gamelist_refresh_thread;
@@ -141,6 +186,11 @@ void HorizonHost::RequestExit()
 bool HorizonHost::IsExitRequested()
 {
 	return s_exit_requested.load(std::memory_order_acquire);
+}
+
+void HorizonHost::SetPerfLogEnabled(bool enabled)
+{
+	s_perf_log_enabled.store(enabled, std::memory_order_release);
 }
 
 std::optional<WindowInfo> Host::AcquireRenderWindow(bool recreate_window)
@@ -284,8 +334,81 @@ void Host::OnGameChanged(const std::string& title, const std::string& elf_overri
 	INFO_LOG("Host: game changed - title='{}' serial='{}' crc={:08X}", title, disc_serial, disc_crc);
 }
 
+// Called from the GS thread each time PerformanceMetrics refreshes (every 0.5s).
+// Writes one averaged line every few seconds so a play session can be diagnosed from the log
+// file alone, without reading the OSD.
 void Host::OnPerformanceMetricsUpdated()
 {
+	if (!s_perf_log_enabled.load(std::memory_order_acquire))
+		return;
+
+	if (VMManager::GetState() != VMState::Running)
+	{
+		ResetPerfLogSamples();
+		return;
+	}
+
+	PerfLogAccumulator& a = s_perf_log;
+	const float speed = PerformanceMetrics::GetSpeed();
+	a.speed_min = (a.samples == 0) ? speed : std::min(a.speed_min, speed);
+	a.speed_sum += speed;
+	a.fps_sum += PerformanceMetrics::GetFPS();
+	a.ee_sum += static_cast<float>(PerformanceMetrics::GetCPUThreadUsage());
+	a.gs_sum += PerformanceMetrics::GetGSThreadUsage();
+	a.vu_sum += PerformanceMetrics::GetVUThreadUsage();
+	a.gpu_sum += PerformanceMetrics::GetGPUUsage();
+	a.stall_vu_sum += PerformanceMetrics::GetEEStallVUTime();
+	a.stall_gs_sum += PerformanceMetrics::GetEEStallGSTime();
+	a.stall_vsync_sum += PerformanceMetrics::GetEEStallVsyncTime();
+	a.gs_gpu_wait_sum += PerformanceMetrics::GetGSGpuWaitTime();
+	a.gs_idle_sum += PerformanceMetrics::GetGSWorkWaitTime();
+	const size_t limiter = static_cast<size_t>(PerformanceMetrics::GetLimiter());
+	if (limiter < a.limiter_counts.size())
+		a.limiter_counts[limiter]++;
+	a.samples++;
+
+	if (a.samples < PERF_LOG_SAMPLES)
+		return;
+
+	static constexpr std::array<const char*, 6> LIMITER_NAMES = {"?", "EE", "VU", "GS", "GPU", "limited"};
+	size_t top_limiter = 0;
+	for (size_t i = 1; i < a.limiter_counts.size(); i++)
+	{
+		if (a.limiter_counts[i] > a.limiter_counts[top_limiter])
+			top_limiter = i;
+	}
+
+	const float n = static_cast<float>(a.samples);
+	INFO_LOG("[PERF] speed {:.0f}% (min {:.0f}%) fps {:.1f} limiter {} ({}/{}) | load EE {:.0f}% GS {:.0f}% VU {:.0f}% "
+			 "GPU {:.0f}% | EE waits ms/frame: vu {:.2f} gs {:.2f} vsync {:.2f} | GS waits ms/frame: gpu {:.2f} idle {:.2f}",
+		a.speed_sum / n, a.speed_min, a.fps_sum / n, LIMITER_NAMES[top_limiter], a.limiter_counts[top_limiter], a.samples,
+		a.ee_sum / n, a.gs_sum / n, a.vu_sum / n, a.gpu_sum / n, a.stall_vu_sum / n, a.stall_gs_sum / n,
+		a.stall_vsync_sum / n, a.gs_gpu_wait_sum / n, a.gs_idle_sum / n);
+
+	const Horizon::FaultStats& fs = Horizon::GetFaultStats();
+	const u64 lazy = fs.lazy_resolved.load(std::memory_order_relaxed);
+	const u64 limit = fs.limit_refusals.load(std::memory_order_relaxed);
+	const u64 prot_reads = fs.protected_reads.load(std::memory_order_relaxed);
+	const u64 prot_read_bp = fs.protected_read_backpatches.load(std::memory_order_relaxed);
+	const u64 prot_writes = fs.protected_writes.load(std::memory_order_relaxed);
+	const u64 backpatches = fs.backpatches.load(std::memory_order_relaxed);
+	const u64 unhandled = fs.unhandled.load(std::memory_order_relaxed);
+	INFO_LOG("[FAULT] fastmem pages {}/{} | since last line: mapped-in {} limit-refused {} code-page reads {} "
+			 "(backpatched {}) code-page writes {} backpatches {} unhandled {} | totals: code-page reads {} writes {} "
+			 "limit-refused {}",
+		fs.live_pages.load(std::memory_order_relaxed), fs.live_page_limit.load(std::memory_order_relaxed),
+		lazy - a.last_lazy, limit - a.last_limit, prot_reads - a.last_prot_reads, prot_read_bp - a.last_prot_read_bp,
+		prot_writes - a.last_prot_writes, backpatches - a.last_backpatches, unhandled - a.last_unhandled, prot_reads,
+		prot_writes, limit);
+	a.last_lazy = lazy;
+	a.last_limit = limit;
+	a.last_prot_reads = prot_reads;
+	a.last_prot_read_bp = prot_read_bp;
+	a.last_prot_writes = prot_writes;
+	a.last_backpatches = backpatches;
+	a.last_unhandled = unhandled;
+
+	ResetPerfLogSamples();
 }
 
 void Host::OnSaveStateLoading(const std::string_view filename)
@@ -366,6 +489,7 @@ void Host::RefreshGameListAsync(bool invalidate_cache)
 		s_gamelist_refresh_thread.join();
 
 	s_gamelist_refresh_thread = std::thread([invalidate_cache]() {
+		Threading::SetNameOfCurrentThread("GameList Refresh");
 		GameList::Refresh(invalidate_cache, false, nullptr);
 	});
 }

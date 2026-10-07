@@ -28,6 +28,10 @@
 #include "common/BitUtils.h"
 #include "common/Error.h"
 
+#ifdef __SWITCH__
+#include "common/Horizon/HorizonTuning.h"
+#endif
+
 #include "fmt/format.h"
 
 #include <bit>
@@ -1603,6 +1607,44 @@ PageFaultHandler::HandlerResult PageFaultHandler::HandlePageFault(void* exceptio
 
 		uptr ptr = (uptr)PSM(vaddr);
 		uptr offset = (ptr - (uptr)eeMem->Main);
+#ifdef __SWITCH__
+		// Only main RAM has protection tracking; anything else must not index the table.
+		const bool tracked_page = ptr && offset < Ps2MemSize::ExposedRam;
+		if (tracked_page && m_PageProtectInfo[offset >> __pageshift].Mode == ProtMode_Write)
+		{
+			Horizon::FaultStats& stats = Horizon::GetFaultStats();
+			if (!is_write)
+			{
+				// Horizon write-protects a code page by unmapping its fastmem alias (an alias
+				// cannot be made read-only), so plain reads of the page land here too. A read
+				// invalidates nothing: send this one load through the slow path, which reads
+				// the still-readable canonical mapping, instead of throwing away every block
+				// on the page and demoting it to manual protection.
+				stats.protected_reads.fetch_add(1, std::memory_order_relaxed);
+				if (Horizon::IsCodePageReadBackpatchEnabled() &&
+					vtlb_BackpatchLoadStore(reinterpret_cast<uptr>(exception_pc), reinterpret_cast<uptr>(fault_address)))
+				{
+					stats.protected_read_backpatches.fetch_add(1, std::memory_order_relaxed);
+					return HandlerResult::ContinueExecution;
+				}
+			}
+			else
+			{
+				stats.protected_writes.fetch_add(1, std::memory_order_relaxed);
+			}
+
+			mmap_ClearCpuBlock(offset);
+			return HandlerResult::ContinueExecution;
+		}
+		else
+		{
+			const bool backpatched = vtlb_BackpatchLoadStore(reinterpret_cast<uptr>(exception_pc),
+				reinterpret_cast<uptr>(fault_address));
+			Horizon::FaultStats& stats = Horizon::GetFaultStats();
+			(backpatched ? stats.backpatches : stats.unhandled).fetch_add(1, std::memory_order_relaxed);
+			return backpatched ? HandlerResult::ContinueExecution : HandlerResult::ExecuteNextHandler;
+		}
+#else
 		if (ptr && m_PageProtectInfo[offset >> __pageshift].Mode == ProtMode_Write)
 		{
 			// fprintf(stderr, "Not backpatching code write at %08X\n", vaddr);
@@ -1617,6 +1659,7 @@ PageFaultHandler::HandlerResult PageFaultHandler::HandlePageFault(void* exceptio
 					   HandlerResult::ContinueExecution :
 					   HandlerResult::ExecuteNextHandler;
 		}
+#endif
 	}
 	else
 	{
@@ -1625,6 +1668,10 @@ PageFaultHandler::HandlerResult PageFaultHandler::HandlePageFault(void* exceptio
 		if (offset >= Ps2MemSize::ExposedRam)
 			return HandlerResult::ExecuteNextHandler;
 
+#ifdef __SWITCH__
+		// A write through the canonical mapping (slow path or C++ code) to a protected code page.
+		Horizon::GetFaultStats().protected_writes.fetch_add(1, std::memory_order_relaxed);
+#endif
 		mmap_ClearCpuBlock(offset);
 		return HandlerResult::ContinueExecution;
 	}

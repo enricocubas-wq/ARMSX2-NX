@@ -167,6 +167,7 @@ elseif(HORIZON)
 		Horizon/HorizonFastmem.cpp
 		Horizon/HorizonHostSys.cpp
 		Horizon/HorizonThreads.cpp
+		Horizon/HorizonTuning.cpp
 		Horizon/HorizonMisc.cpp
 		Horizon/HorizonNet.cpp
 		Horizon/HorizonCompat.cpp

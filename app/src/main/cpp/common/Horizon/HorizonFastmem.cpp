@@ -6,6 +6,7 @@
 
 #include "common/Console.h"
 #include "common/Horizon/Horizon.h"
+#include "common/Horizon/HorizonTuning.h"
 
 #include <algorithm>
 #include <array>
@@ -247,6 +248,14 @@ namespace
 		__atomic_store_n(&s_arena.pages[page], entry, __ATOMIC_RELEASE);
 	}
 
+	// Mirrors the live page count into the diagnostics block. Called with s_segment_mutex held.
+	void PublishLivePagesLocked()
+	{
+		Horizon::FaultStats& stats = Horizon::GetFaultStats();
+		stats.live_pages.store(s_arena.live_pages, std::memory_order_relaxed);
+		stats.live_page_limit.store(LIVE_PAGE_LIMIT, std::memory_order_relaxed);
+	}
+
 	std::map<u8*, Segment>::iterator FindSegmentContainingLocked(uptr addr, size_t size)
 	{
 		auto it = s_segments.upper_bound(reinterpret_cast<u8*>(addr));
@@ -390,6 +399,7 @@ namespace
 			}
 			i += run;
 		}
+		PublishLivePagesLocked();
 		return true;
 	}
 
@@ -412,6 +422,7 @@ namespace
 			StoreEntry(first + i,
 				LoadEntry(first + i) & ~(ENTRY_LAZY | ENTRY_PROTECTED | ENTRY_REMAP));
 		}
+		PublishLivePagesLocked();
 		return true;
 	}
 
@@ -465,6 +476,7 @@ namespace
 		if (s_arena.live_pages)
 			s_arena.live_pages--;
 		StoreEntry(arena_page, entry | ENTRY_LAZY | ENTRY_PROTECTED | ENTRY_REMAP);
+		PublishLivePagesLocked();
 		return true;
 	}
 
@@ -819,9 +831,17 @@ bool ResolveFault(uptr addr)
 	Segment* segment;
 	size_t source_page;
 	if (entry == ENTRY_EMPTY || !(entry & ENTRY_LAZY) || (entry & ENTRY_PROTECTED) ||
-		!EntrySourcePageLocked(entry, &segment, &source_page) ||
-		s_arena.live_pages >= LIVE_PAGE_LIMIT)
+		!EntrySourcePageLocked(entry, &segment, &source_page))
 	{
+		return false;
+	}
+
+	Horizon::FaultStats& stats = Horizon::GetFaultStats();
+	if (s_arena.live_pages >= LIVE_PAGE_LIMIT)
+	{
+		// The caller falls back to backpatching this access to the slow path for good, so every
+		// refusal is a load/store that will never use fastmem again. Worth knowing about.
+		stats.limit_refusals.fetch_add(1, std::memory_order_relaxed);
 		return false;
 	}
 
@@ -843,8 +863,18 @@ bool ResolveFault(uptr addr)
 	}
 
 	if (MapRunLocked(first, count, source_page))
+	{
+		stats.lazy_resolved.fetch_add(1, std::memory_order_relaxed);
+		stats.lazy_pages.fetch_add(count, std::memory_order_relaxed);
 		return true;
-	return count > 1 && MapRunLocked(first, 1, source_page);
+	}
+	if (count > 1 && MapRunLocked(first, 1, source_page))
+	{
+		stats.lazy_resolved.fetch_add(1, std::memory_order_relaxed);
+		stats.lazy_pages.fetch_add(1, std::memory_order_relaxed);
+		return true;
+	}
+	return false;
 }
 
 void DestroySegment(u8* canonical)
