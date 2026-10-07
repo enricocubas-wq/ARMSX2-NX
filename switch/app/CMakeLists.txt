@@ -38,14 +38,16 @@ if(USE_VULKAN OR USE_OPENGL)
 		pkg_check_modules(NXVK REQUIRED nxvk)
 	endif()
 
-	# newlib shims required by NXVK.
-	target_sources(armsx2 PRIVATE nvk_compat.cpp)
 	target_include_directories(armsx2 PRIVATE ${NXVK_INCLUDE_DIRS})
 	target_compile_options(armsx2 PRIVATE ${NXVK_CFLAGS_OTHER})
 
 	target_link_libraries(armsx2 PRIVATE
 		${NXVK_LDFLAGS})
 endif()
+
+# newlib shims required by NXVK. Built unconditionally because the core also needs
+# pthread_sigmask (HTTPDownloaderCurl), which a deko3d-only build would otherwise lack.
+target_sources(armsx2 PRIVATE nvk_compat.cpp)
 
 # uam compiled into the NRO
 if(DK3D_RUNTIME_SHADERS)
