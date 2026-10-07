@@ -1,0 +1,139 @@
+name: NXVK package
+
+# Compila o driver Vulkan/OpenGL (NXVK, port do Mesa NVK) uma vez e guarda o pacote
+# como release, para o build principal baixar. Só roda quando a revisão em
+# ci/nxvk.rev (ou este arquivo) muda.
+
+on:
+  push:
+    branches:
+      - fabrica
+    paths:
+      - 'ci/nxvk.rev'
+      - '.github/workflows/nxvk_package.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nxvk-package
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  nxvk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Read pinned revision
+        id: rev
+        run: |
+          REV="$(tr -d '[:space:]' < ci/nxvk.rev)"
+          echo "rev=$REV" >> "$GITHUB_OUTPUT"
+          echo "short=${REV:0:10}" >> "$GITHUB_OUTPUT"
+          echo "NXVK rev: $REV"
+
+      - name: Free disk space
+        run: |
+          df -h / | tee disk.log
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          df -h / | tee -a disk.log
+
+      - name: Fetch NXVK
+        run: |
+          {
+            mkdir nxvk && cd nxvk
+            git init -q
+            git remote add origin https://github.com/PalindromicBreadLoaf/nxvk.git
+            git fetch -q --depth 1 origin "${{ steps.rev.outputs.rev }}"
+            git checkout -q FETCH_HEAD
+            git log -1 --format='%H %ad %s' --date=short
+          } 2>&1 | tee fetch.log
+
+      - name: Build toolchain image
+        run: |
+          cd nxvk
+          docker build -t nxvk switch/docker 2>&1 | tee ../image.log
+
+      - name: Build driver (Vulkan + OpenGL)
+        run: |
+          cd nxvk
+          docker run --rm -v "$PWD:/work" -w /work nxvk bash -lc '
+            set -euo pipefail
+            git config --global --add safe.directory "*"
+            make CONTAINER= gl
+            make CONTAINER= install-gl
+            cd /opt/devkitpro/portlibs/switch
+            tar -czf /work/nxvk-portlib.tar.gz \
+              lib/libnvk.a lib/libnvk_support.a lib/libnvk_gl.a \
+              lib/pkgconfig/nxvk.pc lib/pkgconfig/nxvk-gl.pc \
+              include/vulkan include/vk_video licenses/nxvk
+            ls -l /work/nxvk-portlib.tar.gz
+          ' 2>&1 | tee ../driver.log
+
+      - name: Package info
+        run: |
+          {
+            ls -l nxvk/nxvk-portlib.tar.gz
+            sha256sum nxvk/nxvk-portlib.tar.gz
+            tar -tzvf nxvk/nxvk-portlib.tar.gz | head -40
+          } 2>&1 | tee package.log
+          cp nxvk/nxvk-portlib.tar.gz .
+
+      - name: Publish package
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nxvk-pkg-${{ steps.rev.outputs.short }}
+          name: NXVK portlib ${{ steps.rev.outputs.short }}
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          body: |
+            Pacote pré-compilado do NXVK (https://github.com/PalindromicBreadLoaf/nxvk),
+            revisão ${{ steps.rev.outputs.rev }}, usado pelo build do Switch.
+            Código-fonte sob GPL-2.0-or-later no repositório acima.
+          files: nxvk-portlib.tar.gz
+
+      - name: Push logs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set +e
+          OUT="$(mktemp -d)"
+          for f in ./*.log; do
+            [ -f "$f" ] || continue
+            # o log do driver é enorme: guarda só o fim e os erros
+            if [ "$(wc -c < "$f")" -gt 3000000 ]; then
+              tail -n 4000 "$f" > "$OUT/$(basename "$f" .log).tail.log"
+              grep -n -E -B2 -A8 '(error(:|\[)|FAILED|fatal error|undefined reference|No such file)' "$f" \
+                | head -n 4000 > "$OUT/$(basename "$f" .log).errors.txt"
+            else
+              cp -f "$f" "$OUT"/
+            fi
+          done
+          {
+            echo "status=$JOB_STATUS"
+            echo "run_number=$GITHUB_RUN_NUMBER"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "sha=$GITHUB_SHA"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "$OUT/status.txt"
+          cd "$OUT"
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "nxvk logs run $GITHUB_RUN_NUMBER ($GITHUB_SHA) status=$JOB_STATUS"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ci-logs-nxvk
+          echo "log push exit=$?"

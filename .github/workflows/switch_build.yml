@@ -9,6 +9,8 @@ on:
       - fabrica
     paths-ignore:
       - '**/*.md'
+      - 'ci/**'
+      - '.github/workflows/nxvk_package.yml'
   workflow_dispatch:
 
 permissions:
