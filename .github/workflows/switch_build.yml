@@ -40,20 +40,37 @@ jobs:
         run: git config --global --add safe.directory '*'
 
       - name: Submodule libusbhsfs
-        run: git submodule update --init --depth 1 switch/externals/libusbhsfs
+        run: git submodule update --init --depth 1 switch/externals/libusbhsfs 2>&1 | tee -a setup.log
 
       - name: Host tools
         run: |
-          apt-get update
-          apt-get install -y --no-install-recommends bison flex python3 ca-certificates
+          {
+            apt-get update
+            apt-get install -y --no-install-recommends bison flex python3 ca-certificates
+          } 2>&1 | tee -a setup.log
 
+      # A imagem devkitpro/devkita64 já traz os portlibs. Só tenta instalar o que faltar,
+      # e não falha aqui se o servidor do devkitPro recusar a conexão do runner.
       - name: Switch portlibs
         run: |
-          dkp-pacman -Sy --noconfirm --needed \
-            switch-dev switch-libpng switch-libjpeg-turbo switch-ntfs-3g switch-lwext4
+          {
+            MISSING=""
+            for pkg in switch-libpng switch-libjpeg-turbo switch-ntfs-3g switch-lwext4 deko3d libnx switch-tools uam; do
+              if dkp-pacman -Q "$pkg" >/dev/null 2>&1; then
+                echo "have $(dkp-pacman -Q "$pkg")"
+              else
+                echo "MISSING $pkg"
+                MISSING="$MISSING $pkg"
+              fi
+            done
+            if [ -n "$MISSING" ]; then
+              echo "Trying to install:$MISSING"
+              dkp-pacman -Sy --noconfirm --needed $MISSING || echo "dkp-pacman install failed (exit $?)"
+            fi
+          } 2>&1 | tee -a setup.log
 
       - name: uam sources
-        run: git clone --depth 1 https://github.com/devkitPro/uam "$GITHUB_WORKSPACE/../uam"
+        run: git clone --depth 1 https://github.com/devkitPro/uam "$GITHUB_WORKSPACE/../uam" 2>&1 | tee -a setup.log
 
       - name: Environment report
         run: |
