@@ -1,0 +1,143 @@
+name: Switch Build
+
+# Compila o .nro do Switch a cada push no ramo "fabrica".
+# Etapa 1: só o renderizador deko3d (sem Vulkan/OpenGL), que não depende do NXVK.
+
+on:
+  push:
+    branches:
+      - fabrica
+    paths-ignore:
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: switch-build-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Mark workspace safe for git
+        run: git config --global --add safe.directory '*'
+
+      - name: Submodule libusbhsfs
+        run: git submodule update --init --depth 1 switch/externals/libusbhsfs
+
+      - name: Host tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends bison flex python3 ca-certificates
+
+      - name: Switch portlibs
+        run: |
+          dkp-pacman -Sy --noconfirm --needed \
+            switch-dev switch-libpng switch-libjpeg-turbo switch-ntfs-3g switch-lwext4
+
+      - name: uam sources
+        run: git clone --depth 1 https://github.com/devkitPro/uam "$GITHUB_WORKSPACE/../uam"
+
+      - name: Environment report
+        run: |
+          {
+            echo "DEVKITPRO=$DEVKITPRO"
+            echo "nproc=$(nproc)"
+            cmake --version | head -1
+            "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc" --version | head -1
+            which uam bison flex python3 || true
+            dkp-pacman -Q | grep -E '^(libnx|deko3d|switch-tools|uam|devkitA64|switch-ntfs-3g|switch-lwext4) ' || true
+          } 2>&1 | tee env.log
+
+      - name: Configure
+        run: |
+          cmake -S app/src/main/cpp -B build/switch-core \
+            -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DUSE_VULKAN=OFF \
+            -DUSE_OPENGL=OFF \
+            -DUAM_ROOT="$GITHUB_WORKSPACE/../uam" 2>&1 | tee configure.log
+
+      - name: Build
+        run: |
+          cmake --build build/switch-core --target armsx2_nro -j"$(nproc)" 2>&1 | tee build.log
+
+      - name: Locate NRO
+        id: locate
+        run: |
+          NRO_PATH=$(find build/switch-core -type f -name 'armsx2nx.nro' -print -quit)
+          if [ -z "$NRO_PATH" ]; then
+            echo "armsx2nx.nro not found" | tee -a build.log
+            exit 1
+          fi
+          cp "$NRO_PATH" armsx2nx.nro
+          ls -l armsx2nx.nro | tee nro.log
+          sha256sum armsx2nx.nro | tee -a nro.log
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: armsx2nx-nro
+          path: armsx2nx.nro
+
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: fabrica-${{ github.run_number }}
+          name: Fabrica build ${{ github.run_number }}
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          body: |
+            Build automático do ramo `fabrica` (commit ${{ github.sha }}).
+            Renderizador: deko3d apenas.
+          files: armsx2nx.nro
+
+      # Os logs vão para o ramo "ci-logs" para poderem ser lidos via git.
+      - name: Push logs
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          set +e
+          OUT="$(mktemp -d)"
+          cp -f ./*.log "$OUT"/ 2>/dev/null
+          cp -f build/switch-core/CMakeFiles/CMakeError.log "$OUT"/ 2>/dev/null
+          cp -f build/switch-core/CMakeFiles/CMakeConfigureLog.yaml "$OUT"/ 2>/dev/null
+          {
+            echo "status=$JOB_STATUS"
+            echo "run_number=$GITHUB_RUN_NUMBER"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "sha=$GITHUB_SHA"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > "$OUT/status.txt"
+          if [ -f "$OUT/build.log" ]; then
+            grep -n -E -B2 -A6 '(error:|Error [0-9]+|undefined reference|FAILED|fatal error|No such file)' \
+              "$OUT/build.log" | head -n 3000 > "$OUT/errors.txt"
+          fi
+          cd "$OUT"
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "logs run $GITHUB_RUN_NUMBER ($GITHUB_SHA) status=$JOB_STATUS"
+          git push -q -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/ci-logs
+          echo "log push exit=$?"
