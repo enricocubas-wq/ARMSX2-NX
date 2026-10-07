@@ -86,7 +86,7 @@ jobs:
           {
             ls -l nxvk/nxvk-portlib.tar.gz
             sha256sum nxvk/nxvk-portlib.tar.gz
-            tar -tzvf nxvk/nxvk-portlib.tar.gz | head -40
+            tar -tzvf nxvk/nxvk-portlib.tar.gz | sed -n '1,40p'
           } 2>&1 | tee package.log
           cp nxvk/nxvk-portlib.tar.gz .
 
