@@ -1,7 +1,8 @@
 name: Switch Build
 
 # Compila o .nro do Switch a cada push no ramo "fabrica".
-# Etapa 1: só o renderizador deko3d (sem Vulkan/OpenGL), que não depende do NXVK.
+# Renderizadores: Vulkan e OpenGL (via pacote NXVK pré-compilado, ver nxvk_package.yml)
+# e deko3d.
 
 on:
   push:
@@ -48,7 +49,7 @@ jobs:
         run: |
           {
             apt-get update
-            apt-get install -y --no-install-recommends bison flex python3 python3-mako ca-certificates
+            apt-get install -y --no-install-recommends bison flex python3 python3-mako ca-certificates curl pkg-config
           } 2>&1 | tee -a setup.log
 
       # A imagem devkitpro/devkita64 já traz os portlibs. Só tenta instalar o que faltar,
@@ -57,7 +58,7 @@ jobs:
         run: |
           {
             MISSING=""
-            for pkg in switch-libpng switch-libjpeg-turbo switch-ntfs-3g switch-lwext4 deko3d libnx switch-tools uam; do
+            for pkg in switch-libpng switch-libjpeg-turbo switch-ntfs-3g switch-lwext4 switch-zlib switch-libexpat deko3d libnx switch-tools uam; do
               if dkp-pacman -Q "$pkg" >/dev/null 2>&1; then
                 echo "have $(dkp-pacman -Q "$pkg")"
               else
@@ -74,15 +75,37 @@ jobs:
       - name: uam sources
         run: git clone --depth 1 https://github.com/devkitPro/uam "$GITHUB_WORKSPACE/../uam" 2>&1 | tee -a setup.log
 
+      # Driver Vulkan/OpenGL pré-compilado, publicado pelo workflow "NXVK package".
+      - name: NXVK package
+        run: |
+          {
+            REV="$(tr -d '[:space:]' < ci/nxvk.rev)"
+            URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/nxvk-pkg-${REV:0:10}/nxvk-portlib.tar.gz"
+            echo "Downloading $URL"
+            curl -fsSL --retry 3 -o /tmp/nxvk-portlib.tar.gz "$URL"
+            sha256sum /tmp/nxvk-portlib.tar.gz
+            tar -xzf /tmp/nxvk-portlib.tar.gz -C "$DEVKITPRO/portlibs/switch"
+            ls -l "$DEVKITPRO/portlibs/switch/lib/libnvk.a" \
+                  "$DEVKITPRO/portlibs/switch/lib/libnvk_support.a" \
+                  "$DEVKITPRO/portlibs/switch/lib/libnvk_gl.a"
+            PKGCFG="$DEVKITPRO/portlibs/switch/bin/aarch64-none-elf-pkg-config"
+            ls -l "$PKGCFG" || true
+            "$PKGCFG" --modversion nxvk nxvk-gl || true
+            "$PKGCFG" --libs nxvk-gl || true
+            ls "$DEVKITPRO/portlibs/switch/include/EGL" 2>/dev/null || echo "no EGL headers in portlibs"
+            ls -l "$DEVKITPRO/portlibs/switch/lib/libEGL.a" 2>/dev/null || echo "no libEGL.a in portlibs"
+          } 2>&1 | tee -a setup.log
+
       - name: Environment report
         run: |
           {
             echo "DEVKITPRO=$DEVKITPRO"
             echo "nproc=$(nproc)"
-            cmake --version | head -1
-            "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc" --version | head -1
+            cmake --version | sed -n '1p'
+            "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc" --version | sed -n '1p'
             which uam bison flex python3 || true
-            dkp-pacman -Q | grep -E '^(libnx|deko3d|switch-tools|uam|devkitA64|switch-ntfs-3g|switch-lwext4) ' || true
+            echo "--- installed dkp packages"
+            dkp-pacman -Q || true
           } 2>&1 | tee env.log
 
       - name: Configure
@@ -91,8 +114,6 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DUSE_VULKAN=OFF \
-            -DUSE_OPENGL=OFF \
             -DUAM_ROOT="$GITHUB_WORKSPACE/../uam" 2>&1 | tee configure.log
 
       - name: Build
@@ -126,7 +147,7 @@ jobs:
           target_commitish: ${{ github.sha }}
           body: |
             Build automático do ramo `fabrica` (commit ${{ github.sha }}).
-            Renderizador: deko3d apenas.
+            Renderizadores: Vulkan, OpenGL e deko3d.
           files: armsx2nx.nro
 
       # Os logs vão para o ramo "ci-logs" para poderem ser lidos via git.
