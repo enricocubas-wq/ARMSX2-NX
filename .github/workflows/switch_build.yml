@@ -46,7 +46,7 @@ jobs:
         run: |
           {
             apt-get update
-            apt-get install -y --no-install-recommends bison flex python3 ca-certificates
+            apt-get install -y --no-install-recommends bison flex python3 python3-mako ca-certificates
           } 2>&1 | tee -a setup.log
 
       # A imagem devkitpro/devkita64 já traz os portlibs. Só tenta instalar o que faltar,
@@ -95,7 +95,7 @@ jobs:
 
       - name: Build
         run: |
-          cmake --build build/switch-core --target armsx2_nro -j"$(nproc)" 2>&1 | tee build.log
+          cmake --build build/switch-core --target armsx2_nro -j"$(nproc)" -- -k 2>&1 | tee build.log
 
       - name: Locate NRO
         id: locate
