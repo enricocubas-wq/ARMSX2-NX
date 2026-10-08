@@ -1,0 +1,212 @@
+-- The C compiler identification is GNU 15.2.0
+-- The CXX compiler identification is GNU 15.2.0
+-- Detected multilib folder: pic
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /opt/devkitpro/devkitA64/bin/aarch64-none-elf-g++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- CMake Version: 3.31.6
+-- CMake System Name: NintendoSwitch
+-- Building for Horizon.
+-- Building with GNU GCC.
+-- The ASM compiler identification is GNU
+-- Found assembler: /opt/devkitpro/devkitA64/bin/aarch64-none-elf-gcc
+-- Building for Nintendo Switch (ARM64).
+-- Found Git: /usr/bin/git (found version "2.39.5")
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+CMake Deprecation Warning at 3rdparty/libwebp/CMakeLists.txt:12 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Performing Test HAVE_BUILTIN_BSWAP16
+-- Performing Test HAVE_BUILTIN_BSWAP16 - Success
+-- Performing Test HAVE_BUILTIN_BSWAP32
+-- Performing Test HAVE_BUILTIN_BSWAP32 - Success
+-- Performing Test HAVE_BUILTIN_BSWAP64
+-- Performing Test HAVE_BUILTIN_BSWAP64 - Success
+-- Found OpenGL: /opt/devkitpro/portlibs/switch/lib/libEGL.a
+-- Performing Test HAVE_MATH_LIBRARY
+-- Performing Test HAVE_MATH_LIBRARY - Success
+-- Found ZLIB: /opt/devkitpro/portlibs/switch/lib/libz.a (found version "1.3.1")
+-- Found PNG: /opt/devkitpro/portlibs/switch/lib/libpng.a (found version "1.6.48")
+-- Found JPEG: /opt/devkitpro/portlibs/switch/lib/libjpeg.a (found version "62")
+-- TIFF is disabled when statically linking.
+-- Found GIF: /opt/devkitpro/portlibs/switch/lib/libgif.a (found version "5.1.4")
+-- Performing Test GIF_COMPILES
+-- Performing Test GIF_COMPILES - Success
+-- Looking for include file GLUT/glut.h
+-- Looking for include file GLUT/glut.h - not found
+-- Looking for include file GL/glut.h
+-- Looking for include file GL/glut.h - not found
+-- Looking for include file OpenGL/glut.h
+-- Looking for include file OpenGL/glut.h - not found
+-- Looking for include file shlwapi.h
+-- Looking for include file shlwapi.h - not found
+-- Looking for include file unistd.h
+-- Looking for include file unistd.h - found
+-- Looking for include file wincodec.h
+-- Looking for include file wincodec.h - not found
+-- Looking for include file windows.h
+-- Looking for include file windows.h - not found
+-- Performing Test WEBP_HAVE_FLAG_SSE41
+-- Performing Test WEBP_HAVE_FLAG_SSE41 - Failed
+-- Performing Test WEBP_HAVE_FLAG_SSE41
+-- Performing Test WEBP_HAVE_FLAG_SSE41 - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+-- Performing Test WEBP_HAVE_FLAG_SSE2
+-- Performing Test WEBP_HAVE_FLAG_SSE2 - Failed
+-- Performing Test WEBP_HAVE_FLAG_SSE2
+-- Performing Test WEBP_HAVE_FLAG_SSE2 - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS32
+-- Performing Test WEBP_HAVE_FLAG_MIPS32 - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS32
+-- Performing Test WEBP_HAVE_FLAG_MIPS32 - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2 - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2 - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+-- Performing Test WEBP_HAVE_FLAG_NEON
+-- Performing Test WEBP_HAVE_FLAG_NEON - Success
+-- Performing Test WEBP_HAVE_FLAG_MSA
+-- Performing Test WEBP_HAVE_FLAG_MSA - Failed
+-- Performing Test WEBP_HAVE_FLAG_MSA
+-- Performing Test WEBP_HAVE_FLAG_MSA - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+WARNHarfBuzz has a Meson port and tries to migrate all the other build systems to it, please consider using it as we might remove our cmake port soon.
+CMake Warning (dev) at 3rdparty/harfbuzz/CMakeLists.txt:78 (include):
+  Policy CMP0148 is not set: The FindPythonInterp and FindPythonLibs modules
+  are removed.  Run "cmake --help-policy CMP0148" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning.
+
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Found PythonInterp: /usr/bin/python (found version "3.11.2")
+-- Looking for atexit
+-- Looking for atexit - found
+-- Looking for mprotect
+-- Looking for mprotect - not found
+-- Looking for sysconf
+-- Looking for sysconf - not found
+-- Looking for getpagesize
+-- Looking for getpagesize - not found
+-- Looking for mmap
+-- Looking for mmap - not found
+-- Looking for isatty
+-- Looking for isatty - found
+-- Looking for sys/mman.h
+-- Looking for sys/mman.h - not found
+-- Looking for stdbool.h
+-- Looking for stdbool.h - found
+CMake Deprecation Warning at 3rdparty/freetype/CMakeLists.txt:113 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Found PkgConfig: /opt/devkitpro/portlibs/switch/bin/aarch64-none-elf-pkg-config (found version "1.8.1")
+-- Found BZip2: /opt/devkitpro/portlibs/switch/lib/libbz2.a (found version "1.0.8")
+-- Looking for BZ2_bzCompressInit
+-- Looking for BZ2_bzCompressInit - found
+-- Checking for module 'bzip2'
+--   Package 'bzip2', required by 'virtual:world', not found
+-- Could NOT find BrotliDec (missing: BROTLIDEC_INCLUDE_DIRS BROTLIDEC_LIBRARIES) 
+-- Performing Test HAVE_EGL
+-- Performing Test HAVE_EGL - Success
+-- Found EGL: /opt/devkitpro/portlibs/switch/include (found version "1.5")
+CMake Deprecation Warning at 3rdparty/cpuinfo/CMakeLists.txt:1 (CMAKE_MINIMUM_REQUIRED):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+CMake Warning at 3rdparty/cpuinfo/CMakeLists.txt:113 (MESSAGE):
+  Target operating system "NintendoSwitch" is not supported in cpuinfo.
+  cpuinfo will compile, but cpuinfo_initialize() will always fail.
+
+
+CMake Deprecation Warning at 3rdparty/libzip/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Looking for sys/types.h
+-- Looking for sys/types.h - found
+-- Looking for stdint.h
+-- Looking for stdint.h - found
+-- Looking for stddef.h
+-- Looking for stddef.h - found
+-- Check size of off_t
+-- Check size of off_t - done
+-- Check size of size_t
+-- Check size of size_t - done
+-- Performing Test HAVE_NULLABLE
+-- Performing Test HAVE_NULLABLE - Failed
+-- Looking for include file pulse/pulseaudio.h
+-- Looking for include file pulse/pulseaudio.h - not found
+-- Looking for include file alsa/asoundlib.h
+-- Looking for include file alsa/asoundlib.h - not found
+-- Looking for include file jack/jack.h
+-- Looking for include file jack/jack.h - not found
+-- Looking for include file sndio.h
+-- Looking for include file sndio.h - not found
+-- Looking for include file sys/soundcard.h
+-- Looking for include file sys/soundcard.h - not found
+-- {fmt} version: 11.1.2
+-- Build type: Release
+-- libusbhsfs: FAT, exFAT, NTFS and EXT2/3/4 USB storage support
+-- Checking for module 'nxvk-gl'
+--   Found nxvk-gl, version 26.2.2
+CMake Warning at CMakeLists.txt:110 (message):
+  
+
+  *************** UNSUPPORTED CONFIGURATION ***************
+
+  You are not compiling PCSX2 with a supported compiler.
+
+  It may not even build successfully.
+
+  PCSX2 only supports the Clang and MSVC compilers.
+
+  No support will be provided, continue at your own risk.
+
+  *********************************************************
+
+
+-- Configuring done (4.9s)
+-- Generating done (0.3s)
+CMake Warning:
+  Manually-specified variables were not used by the project:
+
+    CMAKE_POLICY_VERSION_MINIMUM
+
+
+-- Build files have been written to: /__w/ARMSX2-NX/ARMSX2-NX/build/switch-core

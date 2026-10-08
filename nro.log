@@ -1,0 +1,6 @@
+-rw-r--r-- 1 root root 49858558 Oct  8 03:36 armsx2nx.nro
+4f88d449fe4f7e1991d91fb5deceff6b77a3213f20f96262202fe4462f425c22  armsx2nx.nro
+-rwxr-xr-x 1 root root 272473088 Oct  8 03:36 build/switch-core/switch-app/armsx2.elf
+-rw-r--r-- 1 root root 69253352 Oct  8 03:36 armsx2nx.elf.xz
+-rw-r--r-- 1 root root   807764 Oct  8 03:36 symbols.txt.gz
+436c8a5369ecd7c6f9aeec12fa996f57ab5fdb0e083b33bf416a314b39139d76  armsx2nx.elf.xz

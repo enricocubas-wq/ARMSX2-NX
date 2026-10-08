@@ -1,0 +1,9 @@
+1410-/__w/ARMSX2-NX/ARMSX2-NX/app/src/main/cpp/3rdparty/harfbuzz/src/hb-buffer-verify.cc: In member function 'bool hb_buffer_t::verify(hb_buffer_t*, hb_font_t*, const hb_feature_t*, unsigned int, const char* const*)':
+1411-/__w/ARMSX2-NX/ARMSX2-NX/app/src/main/cpp/3rdparty/harfbuzz/src/hb-buffer-verify.cc:34:29: warning: '%s' directive argument is null [-Wformat-overflow=]
+1412:   34 | #define BUFFER_VERIFY_ERROR "buffer verify error: "
+1413-      |                             ^
+1414-/__w/ARMSX2-NX/ARMSX2-NX/app/src/main/cpp/3rdparty/harfbuzz/src/hb-buffer-verify.cc:415:40: note: in expansion of macro 'BUFFER_VERIFY_ERROR'
+1415-  415 |       buffer_verify_error (this, font, BUFFER_VERIFY_ERROR "text was: %s.", bytes.arrayZ);
+1416-      |                                        ^~~~~~~~~~~~~~~~~~~
+1417-[ 50%] Building CXX object switch-app/CMakeFiles/uam_objects.dir/__w/ARMSX2-NX/uam/mesa-imported/glsl/opt_flatten_nested_if_blocks.o
+1418-[ 50%] Building CXX object switch-app/CMakeFiles/uam_objects.dir/__w/ARMSX2-NX/uam/mesa-imported/glsl/opt_flip_matrices.o
