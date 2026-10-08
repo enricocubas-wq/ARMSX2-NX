@@ -310,6 +310,8 @@ Threading::ThreadHandle& Threading::Thread::operator=(Thread&& thread)
 void Threading::SetNameOfCurrentThread(const char* name)
 {
 	// Horizon has no thread names, but every long-lived thread announces itself here right after
-	// it starts, which makes it the one place to decide where that thread should run.
+	// it starts, which makes it the one place to decide where that thread should run and to
+	// remember its handle for diagnostics.
+	Horizon::RegisterCurrentThread(name);
 	Horizon::ApplyThreadPolicy(name);
 }

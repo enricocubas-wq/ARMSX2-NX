@@ -49,7 +49,7 @@ jobs:
         run: |
           {
             apt-get update
-            apt-get install -y --no-install-recommends bison flex python3 python3-mako ca-certificates curl pkg-config
+            apt-get install -y --no-install-recommends bison flex python3 python3-mako ca-certificates curl pkg-config xz-utils
           } 2>&1 | tee -a setup.log
 
       # A imagem devkitpro/devkita64 já traz os portlibs. Só tenta instalar o que faltar,
@@ -114,6 +114,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE="$DEVKITPRO/cmake/Switch.cmake" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
             -DUAM_ROOT="$GITHUB_WORKSPACE/../uam" 2>&1 | tee configure.log
 
       - name: Build
@@ -132,6 +133,24 @@ jobs:
           ls -l armsx2nx.nro | tee nro.log
           sha256sum armsx2nx.nro | tee -a nro.log
 
+      # O .nro não leva nomes de função. O ELF (com nomes e linhas) vai junto no release para
+      # traduzir os endereços das linhas "[PROF]" do log em nomes de função.
+      - name: Debug files
+        run: |
+          {
+            ELF_PATH=$(find build/switch-core -type f -name 'armsx2.elf' -print -quit)
+            if [ -z "$ELF_PATH" ]; then
+              echo "armsx2.elf not found"
+              exit 1
+            fi
+            ls -l "$ELF_PATH"
+            "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-nm" -n -S -C --defined-only "$ELF_PATH" \
+              | gzip -9 > symbols.txt.gz
+            xz -T0 -3 -c "$ELF_PATH" > armsx2nx.elf.xz
+            ls -l symbols.txt.gz armsx2nx.elf.xz
+            sha256sum armsx2nx.elf.xz
+          } 2>&1 | tee -a nro.log
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -148,7 +167,11 @@ jobs:
           body: |
             Build automático do ramo `fabrica` (commit ${{ github.sha }}).
             Renderizadores: Vulkan, OpenGL e deko3d.
-          files: armsx2nx.nro
+
+            Para o Switch basta o `armsx2nx.nro`. O `armsx2nx.elf.xz` é só para diagnóstico.
+          files: |
+            armsx2nx.nro
+            armsx2nx.elf.xz
 
       # Os logs vão para o ramo "ci-logs" para poderem ser lidos via git.
       - name: Push logs
@@ -160,6 +183,8 @@ jobs:
           set +e
           OUT="$(mktemp -d)"
           cp -f ./*.log "$OUT"/ 2>/dev/null
+          cp -f symbols.txt.gz "$OUT"/ 2>/dev/null
+          gzip -9 -c build/switch-core/compile_commands.json > "$OUT/compile_commands.json.gz" 2>/dev/null
           cp -f build/switch-core/CMakeFiles/CMakeError.log "$OUT"/ 2>/dev/null
           cp -f build/switch-core/CMakeFiles/CMakeConfigureLog.yaml "$OUT"/ 2>/dev/null
           {

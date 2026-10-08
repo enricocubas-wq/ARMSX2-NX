@@ -8,7 +8,9 @@
 #include "common/Error.h"
 #include "common/HostSys.h"
 #include "common/Horizon/HorizonFastmem.h"
+#include "common/Horizon/HorizonTuning.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
@@ -215,6 +217,50 @@ namespace
 	}
 } // namespace
 
+namespace
+{
+	// The kernel only reprotects a range whose pages all share one state, permission and
+	// attribute set; anything else is refused as a whole with InvalidCurrentMemory. That is
+	// exactly what the reset of EE RAM looks like while some of its pages are write-protected
+	// code pages. This redoes such a call one uniform kernel memory block at a time.
+	bool ReprotectByRuns(void* baseaddr, size_t size, u32 prot)
+	{
+		Horizon::ReprotectStats& stats = Horizon::GetReprotectStats();
+		stats.split_calls.fetch_add(1, std::memory_order_relaxed);
+
+		const uptr end = reinterpret_cast<uptr>(baseaddr) + size;
+		uptr cur = reinterpret_cast<uptr>(baseaddr);
+		bool ok = true;
+		while (cur < end)
+		{
+			MemoryInfo info = {};
+			u32 page_info = 0;
+			if (R_FAILED(svcQueryMemory(&info, &page_info, cur)) || info.addr > cur ||
+				info.size == 0 || (info.addr + info.size) <= cur)
+			{
+				stats.failures.fetch_add(1, std::memory_order_relaxed);
+				return false;
+			}
+
+			const uptr run_end = std::min<uptr>(end, info.addr + info.size);
+			if (info.perm != prot)
+			{
+				if (R_SUCCEEDED(svcSetMemoryPermission(reinterpret_cast<void*>(cur), run_end - cur, prot)))
+				{
+					stats.split_runs.fetch_add(1, std::memory_order_relaxed);
+				}
+				else
+				{
+					stats.failures.fetch_add(1, std::memory_order_relaxed);
+					ok = false;
+				}
+			}
+			cur = run_end;
+		}
+		return ok;
+	}
+} // namespace
+
 void HostSys::MemProtect(void* baseaddr, size_t size, const PageProtectionMode& mode)
 {
 	pxAssertMsg((size & (__pagesize - 1)) == 0, "Size is page aligned");
@@ -243,7 +289,24 @@ void HostSys::MemProtect(void* baseaddr, size_t size, const PageProtectionMode& 
 		return;
 	}
 
-	const Result rc = svcSetMemoryPermission(baseaddr, size, HorizonProt(mode));
+	const u32 prot = HorizonProt(mode);
+	Result rc = svcSetMemoryPermission(baseaddr, size, prot);
+	if (R_FAILED(rc) && size > __pagesize)
+	{
+		const Result bulk_rc = rc;
+		if (ReprotectByRuns(baseaddr, size, prot))
+			rc = 0;
+
+		static bool s_split_logged = false;
+		if (!s_split_logged)
+		{
+			Console.WriteLn("HostSys::MemProtect: bulk svcSetMemoryPermission(%p, 0x%zx) was refused (0x%08x); "
+							"reprotected piecewise instead (%s). Further occurrences are only counted.",
+				baseaddr, size, static_cast<u32>(bulk_rc), R_SUCCEEDED(rc) ? "ok" : "with failures");
+			s_split_logged = true;
+		}
+	}
+
 	if (R_FAILED(rc))
 	{
 		static bool s_warned = false;
@@ -253,6 +316,8 @@ void HostSys::MemProtect(void* baseaddr, size_t size, const PageProtectionMode& 
 							"(continuing with further failures suppressed)", baseaddr, size, static_cast<u32>(rc));
 			s_warned = true;
 		}
+		if (size <= __pagesize)
+			Horizon::GetReprotectStats().failures.fetch_add(1, std::memory_order_relaxed);
 	}
 	else if (canonical && mode.CanWrite())
 	{

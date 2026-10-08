@@ -393,13 +393,15 @@ void Host::OnPerformanceMetricsUpdated()
 	const u64 prot_writes = fs.protected_writes.load(std::memory_order_relaxed);
 	const u64 backpatches = fs.backpatches.load(std::memory_order_relaxed);
 	const u64 unhandled = fs.unhandled.load(std::memory_order_relaxed);
+	const Horizon::ReprotectStats& rs = Horizon::GetReprotectStats();
 	INFO_LOG("[FAULT] fastmem pages {}/{} | since last line: mapped-in {} limit-refused {} code-page reads {} "
 			 "(backpatched {}) code-page writes {} backpatches {} unhandled {} | totals: code-page reads {} writes {} "
-			 "limit-refused {}",
+			 "limit-refused {} | reprotect totals: split calls {} runs {} failures {}",
 		fs.live_pages.load(std::memory_order_relaxed), fs.live_page_limit.load(std::memory_order_relaxed),
 		lazy - a.last_lazy, limit - a.last_limit, prot_reads - a.last_prot_reads, prot_read_bp - a.last_prot_read_bp,
 		prot_writes - a.last_prot_writes, backpatches - a.last_backpatches, unhandled - a.last_unhandled, prot_reads,
-		prot_writes, limit);
+		prot_writes, limit, rs.split_calls.load(std::memory_order_relaxed), rs.split_runs.load(std::memory_order_relaxed),
+		rs.failures.load(std::memory_order_relaxed));
 	a.last_lazy = lazy;
 	a.last_limit = limit;
 	a.last_prot_reads = prot_reads;

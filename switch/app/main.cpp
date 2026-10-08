@@ -8,6 +8,7 @@
 
 #include "pcsx2/Config.h"
 #include "pcsx2/Host.h"
+#include "pcsx2/Host/HorizonProfiler.h"
 #include "pcsx2/INISettingsInterface.h"
 #include "pcsx2/ImGui/FullscreenUI.h"
 #include "pcsx2/ImGui/ImGuiManager.h"
@@ -205,6 +206,7 @@ namespace
 		const bool thread_tuning = GetTuningToggle("ThreadTuning", true, &dirty);
 		const bool code_page_read_backpatch = GetTuningToggle("CodePageReadBackpatch", true, &dirty);
 		const bool perf_log = GetTuningToggle("PerfLog", true, &dirty);
+		const bool profiler = GetTuningToggle("Profiler", true, &dirty);
 		if (dirty)
 			s_settings_interface->Save();
 
@@ -212,8 +214,13 @@ namespace
 		Horizon::InitThreadTuning(thread_tuning);
 		Horizon::SetCodePageReadBackpatchEnabled(code_page_read_backpatch);
 		HorizonHost::SetPerfLogEnabled(perf_log);
-		INFO_LOG("Horizon tuning: ThreadTuning={} CodePageReadBackpatch={} PerfLog={}", thread_tuning,
-			code_page_read_backpatch, perf_log);
+		INFO_LOG("Horizon tuning: ThreadTuning={} CodePageReadBackpatch={} PerfLog={} Profiler={}", thread_tuning,
+			code_page_read_backpatch, perf_log, profiler);
+
+		// Diagnostic sampling of the EE/GS/VU threads ("[PROF]" lines in the log). Costs about
+		// 1% of speed while a game runs; set Profiler = false in armsx2.ini to turn it off.
+		if (profiler)
+			HorizonProfiler::Start();
 	}
 
 	bool SyncUsbGameRoots()
@@ -454,6 +461,9 @@ int main(int argc, char** argv)
 
 	stop_loop.store(true, std::memory_order_relaxed);
 	input_thread.join();
+
+	// Stop sampling before the emulation threads are torn down.
+	HorizonProfiler::Stop();
 
 	Host::CancelGameListRefresh();
 

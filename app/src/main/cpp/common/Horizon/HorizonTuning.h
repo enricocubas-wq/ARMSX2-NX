@@ -6,6 +6,7 @@
 #include "common/Pcsx2Defs.h"
 
 #include <atomic>
+#include <cstddef>
 
 // Switch-specific runtime tuning and diagnostics.
 //
@@ -17,17 +18,19 @@ namespace Horizon
 	// --------------------------------------------------------------------------------------
 	//  Thread placement
 	// --------------------------------------------------------------------------------------
-	// Background on why this exists:
-	//  * hbloader gives homebrew cores 0-2 and makes core 0 the process default.
-	//  * libnx creates every pthread/std::thread on the default core at priority 59, and the
-	//    kernel pins a thread created that way to that single core.
-	//  * The EE runs on the main thread (priority 44), which is pinned to core 0.
-	// The result is that every helper thread (disc reader, audio, shader compiler, input...)
-	// shares core 0 with the EE at a lower priority and only runs while the EE is blocked.
+	// Background:
+	//  * hbloader gives homebrew cores 0-2.
+	//  * libnx creates every pthread/std::thread at priority 59 (the lowest) and lets it float
+	//    across all allowed cores (threadCreate() followed by svcSetThreadCoreMask(-1, mask)).
+	//  * The EE runs on the main thread at priority 44.
+	// So the GS and VU threads start at the same (lowest) priority as every helper thread (disc
+	// reader, audio, shader compiler, input...) and time-slice against them.
 	//
-	// With thread tuning enabled, helper threads may run on any allowed core (preferring core 1),
-	// and the GS/VU threads are raised to the EE thread's priority so helpers never time-slice
-	// against them.
+	// With thread tuning enabled the GS/VU threads are raised to the EE thread's priority, the
+	// audio thread goes one step above it, and helpers prefer core 1.
+	//
+	// Measured on a Switch V1 (fabrica-7 log): threads were already spread over cores 0-2 before
+	// this existed, so the only real change is the priority of the GS/VU/audio threads.
 
 	/// Captures the calling (main/EE) thread's priority and stores the toggle.
 	/// Must be called once from the main thread before any other thread is created.
@@ -66,4 +69,33 @@ namespace Horizon
 	};
 
 	FaultStats& GetFaultStats();
+
+	/// Counters for HostSys::MemProtect()'s fallback path (see HorizonHostSys.cpp).
+	struct ReprotectStats
+	{
+		std::atomic<u64> split_calls{0}; ///< bulk calls the kernel refused and that were redone piecewise
+		std::atomic<u64> split_runs{0}; ///< uniform runs reprotected by those calls
+		std::atomic<u64> failures{0}; ///< runs (or whole calls) that could not be reprotected
+	};
+
+	ReprotectStats& GetReprotectStats();
+
+	// --------------------------------------------------------------------------------------
+	//  Thread registry
+	// --------------------------------------------------------------------------------------
+	// Every long-lived thread announces itself through Threading::SetNameOfCurrentThread(). The
+	// registry remembers its kernel handle so diagnostics (the sampling profiler) can find the
+	// emulation threads by name.
+	struct ThreadRecord
+	{
+		char name[32];
+		u32 handle; ///< kernel handle, valid while the thread is alive
+		u64 thread_id; ///< kernel thread id, to tell a live thread from a reused handle
+	};
+
+	/// Registers (or re-registers) the calling thread under the given name.
+	void RegisterCurrentThread(const char* name);
+
+	/// Copies the registered threads into out and returns how many were written.
+	size_t GetRegisteredThreads(ThreadRecord* out, size_t max_count);
 } // namespace Horizon

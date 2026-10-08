@@ -7,6 +7,7 @@
 #include "common/Horizon/Horizon.h"
 
 #include <cstring>
+#include <mutex>
 
 namespace Horizon
 {
@@ -16,8 +17,8 @@ namespace Horizon
 		constexpr s32 DEFAULT_MAIN_PRIORITY = 0x2C;
 		// Range hbloader's NPDM allows (numerically lower is more urgent).
 		constexpr s32 MOST_URGENT_PRIORITY = 28;
-		// Preferred core for helper threads. Core 0 belongs to the EE and core 2 to the GS thread;
-		// the VU thread on core 1 is the one that idles the most.
+		// Preferred core for helper threads. They may still run on any allowed core; this is only
+		// the scheduler's first choice.
 		constexpr s32 HELPER_IDEAL_CORE = 1;
 
 		std::atomic_bool s_thread_tuning{false};
@@ -26,6 +27,13 @@ namespace Horizon
 		std::atomic_bool s_code_page_read_backpatch{false};
 
 		FaultStats s_fault_stats;
+		ReprotectStats s_reprotect_stats;
+
+		constexpr size_t MAX_REGISTERED_THREADS = 48;
+		std::mutex s_registry_mutex;
+		ThreadRecord s_registry[MAX_REGISTERED_THREADS];
+		size_t s_registry_count = 0;
+		size_t s_registry_next_victim = 0;
 
 		enum class ThreadPolicy
 		{
@@ -58,8 +66,8 @@ namespace Horizon
 			}
 		}
 
-		// Lets the calling thread run on every core the process may use instead of only the
-		// process default core.
+		// Keeps the calling thread on every core the process may use (libnx's default) and gives
+		// it a preferred core.
 		void SpreadCurrentThread(const char* name)
 		{
 			u64 allowed = 0;
@@ -155,5 +163,52 @@ namespace Horizon
 	FaultStats& GetFaultStats()
 	{
 		return s_fault_stats;
+	}
+
+	ReprotectStats& GetReprotectStats()
+	{
+		return s_reprotect_stats;
+	}
+
+	void RegisterCurrentThread(const char* name)
+	{
+		if (!name || !name[0])
+			return;
+
+		ThreadRecord record = {};
+		std::strncpy(record.name, name, sizeof(record.name) - 1);
+		record.handle = threadGetCurHandle();
+		if (R_FAILED(svcGetThreadId(&record.thread_id, record.handle)))
+			return;
+
+		std::lock_guard lock(s_registry_mutex);
+		for (size_t i = 0; i < s_registry_count; i++)
+		{
+			// A thread that was restarted under the same name replaces the old entry.
+			if (std::strncmp(s_registry[i].name, record.name, sizeof(record.name)) == 0)
+			{
+				s_registry[i] = record;
+				return;
+			}
+		}
+
+		if (s_registry_count < MAX_REGISTERED_THREADS)
+		{
+			s_registry[s_registry_count++] = record;
+			return;
+		}
+
+		// Full (many short-lived uniquely named threads): recycle entries round-robin.
+		s_registry[s_registry_next_victim] = record;
+		s_registry_next_victim = (s_registry_next_victim + 1) % MAX_REGISTERED_THREADS;
+	}
+
+	size_t GetRegisteredThreads(ThreadRecord* out, size_t max_count)
+	{
+		std::lock_guard lock(s_registry_mutex);
+		const size_t count = (s_registry_count < max_count) ? s_registry_count : max_count;
+		for (size_t i = 0; i < count; i++)
+			out[i] = s_registry[i];
+		return count;
 	}
 } // namespace Horizon

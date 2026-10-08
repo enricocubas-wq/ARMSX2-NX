@@ -1,0 +1,81 @@
+name: Devkit headers
+
+# Empacota só os cabeçalhos (.h) do compilador do Switch usados pelo build, para permitir
+# conferir a sintaxe de um arquivo sem esperar o build completo.
+# Roda quando ci/devkit-headers.rev muda.
+
+on:
+  push:
+    branches:
+      - fabrica
+    paths:
+      - 'ci/devkit-headers.rev'
+      - '.github/workflows/devkit_headers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Pack headers
+        id: pack
+        run: |
+          REV="$(tr -d '[:space:]' < ci/devkit-headers.rev)"
+          echo "rev=$REV" >> "$GITHUB_OUTPUT"
+          apt-get update >/dev/null 2>&1 || true
+          apt-get install -y --no-install-recommends xz-utils >/dev/null 2>&1 || true
+          GCC_VER="$("$DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc" -dumpversion)"
+          cd "$DEVKITPRO"
+          {
+            echo "gcc=$GCC_VER"
+            "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-gcc" --version | sed -n '1p'
+            echo "--- default include search path"
+            echo | "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-g++" -x c++ -E -v - 2>&1 | sed -n '/#include </,/End of search list/p'
+            echo "--- predefined macros"
+            echo | "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-g++" -x c++ -dM -E - | sort
+            echo "--- switch toolchain file"
+            cat "$DEVKITPRO/cmake/Switch.cmake" 2>/dev/null
+            cat "$DEVKITPRO/cmake/Platform/NintendoSwitch.cmake" 2>/dev/null
+            cat "$DEVKITPRO/cmake/devkitA64.cmake" 2>/dev/null
+          } > "$GITHUB_WORKSPACE/devkit-info.txt" 2>&1
+          DIRS=()
+          for d in devkitA64/aarch64-none-elf/include \
+                   "devkitA64/lib/gcc/aarch64-none-elf/$GCC_VER/include" \
+                   "devkitA64/lib/gcc/aarch64-none-elf/$GCC_VER/include-fixed" \
+                   libnx/include \
+                   portlibs/switch/include; do
+            if [ -d "$d" ]; then DIRS+=("$d"); else echo "missing $d" >> "$GITHUB_WORKSPACE/devkit-info.txt"; fi
+          done
+          tar -cJf "$GITHUB_WORKSPACE/devkit-headers.tar.xz" "${DIRS[@]}"
+          ls -l "$GITHUB_WORKSPACE/devkit-headers.tar.xz" "$GITHUB_WORKSPACE/devkit-info.txt"
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: devkit-headers-${{ steps.pack.outputs.rev }}
+          name: Devkit headers ${{ steps.pack.outputs.rev }}
+          prerelease: true
+          target_commitish: ${{ github.sha }}
+          body: |
+            Cabeçalhos do devkitA64, libnx e portlibs usados pela fábrica (só arquivos .h, sem binários).
+            Uso interno do build; não é para o Switch.
+          files: |
+            devkit-headers.tar.xz
+            devkit-info.txt
