@@ -36,6 +36,7 @@
 #include <cstring>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
@@ -208,6 +209,7 @@ namespace
 	struct StackKey
 	{
 		u32 head; // HEAD_SVC | number, or the 64-byte bucket of the running code
+		u32 lr; // running code only: the link register when it is informative, else LOC_NONE
 		u32 depth;
 		std::array<u32, MAX_CHAIN> chain; // callers, nearest first; unused entries are zero
 	};
@@ -241,6 +243,7 @@ namespace
 				hash = (hash ^ value) * 16777619u;
 			};
 			mix(key.head);
+			mix(key.lr);
 			mix(key.depth);
 			for (const u32 value : key.chain)
 				mix(value);
@@ -296,6 +299,8 @@ namespace
 		bool announced = false;
 		Handle handle = INVALID_HANDLE;
 		u64 thread_id = 0;
+		uptr stack_begin = 0; // frame records are only read inside this range
+		uptr stack_end = 0;
 		ThreadProfile profile;
 	};
 
@@ -322,15 +327,21 @@ namespace
 		size_t dumped_count = 0;
 		u64 pause_ticks = 0;
 		u32 pause_count = 0;
+		u32 resume_retries = 0;
+		u32 resume_failures = 0;
 	};
 
+	std::mutex s_lifecycle_mutex; // serialises Start() and Stop()
 	std::unique_ptr<State> s_state;
 
 	// --------------------------------------------------------------------------------------
 	//  Sampling
 	// --------------------------------------------------------------------------------------
-	bool Capture(Handle handle, const CodeMap& map, bool is_ee, RawSample* out)
+	// Returns false if the thread could not be paused or read. *resume_retries counts extra
+	// attempts needed to let it go again; *resume_failed is set if it could not be resumed at all.
+	bool Capture(const Target& target, const CodeMap& map, RawSample* out, u32* resume_retries, bool* resume_failed)
 	{
+		const Handle handle = target.handle;
 		if (R_FAILED(svcSetThreadActivity(handle, ThreadActivity_Paused)))
 			return false;
 
@@ -343,7 +354,7 @@ namespace
 			out->lr = ctx.lr;
 			out->fp = ctx.fp;
 			out->sp = ctx.sp;
-			out->guest_pc = is_ee ? cpuRegs.pc : 0;
+			out->guest_pc = target.is_ee ? cpuRegs.pc : 0;
 			out->svc = NOT_IN_SVC;
 			out->depth = 0;
 
@@ -366,15 +377,15 @@ namespace
 						out->svc = SvcNumber(before_pc);
 				}
 
-				// Walk the frame records, never leaving the mapping the stack pointer is in.
-				MemoryInfo info = {};
-				u32 page_info = 0;
-				if (R_SUCCEEDED(svcQueryMemory(&info, &page_info, out->sp)) && (info.perm & Perm_R) != 0)
+				// Walk the frame records, never leaving the thread's own stack. A thread running on
+				// another stack (the exception stack, say) gets no call chain.
+				const uptr low = std::max(out->sp, target.stack_begin);
+				const uptr high = target.stack_end;
+				const u32 max_depth = (out->svc != NOT_IN_SVC) ? MAX_CHAIN : RUNNING_CHAIN;
+				uptr fp = out->fp;
+				if (out->sp >= target.stack_begin && out->sp < high)
 				{
-					const uptr low = out->sp;
-					const uptr high = info.addr + info.size;
-					uptr fp = out->fp;
-					while (out->depth < MAX_CHAIN && (fp & 7) == 0 && fp >= low && fp < high && (high - fp) >= 16)
+					while (out->depth < max_depth && (fp & 7) == 0 && fp >= low && fp < high && (high - fp) >= 16)
 					{
 						const uptr* const record = reinterpret_cast<const uptr*>(fp);
 						const uptr next_fp = record[0];
@@ -387,7 +398,20 @@ namespace
 			}
 		}
 
-		svcSetThreadActivity(handle, ThreadActivity_Runnable);
+		// Let it go. Resuming a live, paused thread of our own cannot fail, but if it ever did the
+		// emulator would hang, so try again before giving up.
+		for (u32 attempt = 0;; attempt++)
+		{
+			if (R_SUCCEEDED(svcSetThreadActivity(handle, ThreadActivity_Runnable)))
+				break;
+			if (attempt == 3)
+			{
+				*resume_failed = true;
+				break;
+			}
+			(*resume_retries)++;
+			svcSleepThread(0);
+		}
 		// ---- The target is running again. ----
 		return ok;
 	}
@@ -428,10 +452,8 @@ namespace
 			limit = RUNNING_CHAIN;
 		}
 
-		// Callers. The link register comes first: it is the caller of a leaf function (a system
-		// call stub, memcpy, a small helper called from recompiled code). In a function that
-		// has made calls of its own it points back into that function or holds a temporary, so
-		// it is skipped when it is not a code address or repeats the first frame record.
+		// Callers, nearest first, from the frame records. The walk stops at the first address
+		// that is not native code (recompiled code does not keep frame records).
 		bool walking = true;
 		const auto push = [&](uptr addr) {
 			const u32 caller = Locate(map, addr);
@@ -439,9 +461,25 @@ namespace
 			walking = IsNativeLoc(caller);
 		};
 
-		const bool lr_repeats_frame = sample.depth > 0 && sample.chain[0] == sample.lr;
-		if (!lr_repeats_frame && Locate(map, sample.lr) != LOC_NONE)
-			push(sample.lr);
+		// The link register. A system call stub is a leaf function, so there it is the caller
+		// and goes first in the chain. For running code it is only trustworthy as the caller of a
+		// leaf function; in a function that has made calls of its own it points back into that
+		// function or holds a temporary. It is kept apart, and only when it says something the
+		// frame records cannot: that the code was called from recompiled code, or who called a
+		// function that has no usable frame record.
+		key.lr = LOC_NONE;
+		const u32 lr_loc = Locate(map, sample.lr);
+		if (sample.svc != NOT_IN_SVC)
+		{
+			const bool lr_repeats_frame = sample.depth > 0 && sample.chain[0] == sample.lr;
+			if (!lr_repeats_frame && lr_loc != LOC_NONE)
+				push(sample.lr);
+		}
+		else if (IsJitLoc(lr_loc) || (IsNativeLoc(lr_loc) && sample.depth == 0))
+		{
+			key.lr = lr_loc;
+		}
+
 		for (u32 i = 0; i < sample.depth && walking && key.depth < limit; i++)
 			push(sample.chain[i]);
 
@@ -461,11 +499,21 @@ namespace
 			return;
 		}
 
-		RawSample sample;
+		RawSample sample = {};
+		bool resume_failed = false;
 		const u64 before = armGetSystemTick();
-		const bool ok = Capture(target.handle, state.map, target.is_ee, &sample);
+		const bool ok = Capture(target, state.map, &sample, &state.resume_retries, &resume_failed);
 		state.pause_ticks += armGetSystemTick() - before;
 		state.pause_count++;
+
+		if (resume_failed)
+		{
+			// Never seen, never expected. Stop touching this thread and say so.
+			state.resume_failures++;
+			ERROR_LOG("[PROF] could not resume thread {} (id {}); no longer sampling it", target.label, target.thread_id);
+			target.handle = INVALID_HANDLE;
+			return;
+		}
 
 		if (ok)
 			Accumulate(target.profile, sample, state.map, target.is_ee);
@@ -485,8 +533,9 @@ namespace
 		u64 core_mask = 0;
 		svcGetThreadPriority(&priority, target.handle);
 		svcGetThreadCoreMask(&ideal_core, &core_mask, target.handle);
-		INFO_LOG("[PROF] sampling thread {}: id {}, priority {}, ideal core {}, core mask {:#x}", target.label,
-			target.thread_id, priority, ideal_core, core_mask);
+		INFO_LOG("[PROF] sampling thread {}: id {}, priority {}, ideal core {}, core mask {:#x}, stack {:#x}+{:#x}",
+			target.label, target.thread_id, priority, ideal_core, core_mask, target.stack_begin,
+			target.stack_end - target.stack_begin);
 	}
 
 	void RefreshTargets(State& state)
@@ -518,6 +567,8 @@ namespace
 				{
 					target.handle = record.handle;
 					target.thread_id = record.thread_id;
+					target.stack_begin = record.stack_begin;
+					target.stack_end = record.stack_end;
 					AnnounceTarget(target);
 				}
 				break;
@@ -654,6 +705,12 @@ namespace
 		{
 			line = fmt::format("[PROF] {} stack {}: ", target.label, slot->count);
 			AppendLoc(line, slot->key.head);
+			if (slot->key.lr != LOC_NONE)
+			{
+				line += " (lr ";
+				AppendLoc(line, slot->key.lr);
+				line += ')';
+			}
 			for (u32 i = 0; i < slot->key.depth; i++)
 			{
 				line += " < ";
@@ -696,8 +753,10 @@ namespace
 
 		if (state.pause_count != 0)
 		{
-			INFO_LOG("[PROF] sampler: {} pauses, {:.1f} us each on average", state.pause_count,
-				static_cast<double>(armTicksToNs(state.pause_ticks)) / 1000.0 / static_cast<double>(state.pause_count));
+			INFO_LOG("[PROF] sampler: {} pauses, {:.1f} us each on average, resume retries {}, resume failures {}",
+				state.pause_count,
+				static_cast<double>(armTicksToNs(state.pause_ticks)) / 1000.0 / static_cast<double>(state.pause_count),
+				state.resume_retries, state.resume_failures);
 		}
 	}
 
@@ -707,6 +766,7 @@ namespace
 			target.profile.Clear();
 		state.pause_ticks = 0;
 		state.pause_count = 0;
+		state.resume_retries = 0;
 	}
 
 	u64 NextRandom(u64& value)
@@ -777,6 +837,7 @@ namespace
 
 void HorizonProfiler::Start()
 {
+	std::lock_guard lock(s_lifecycle_mutex);
 	if (s_state)
 		return;
 
@@ -809,6 +870,11 @@ void HorizonProfiler::Start()
 	{
 		WARNING_LOG("[PROF] could not identify the main thread; profiler disabled");
 		return;
+	}
+	if (const ::Thread* const self = threadGetSelf(); self && self->stack_mirror && self->stack_sz)
+	{
+		ee.stack_begin = reinterpret_cast<uptr>(self->stack_mirror);
+		ee.stack_end = ee.stack_begin + self->stack_sz;
 	}
 
 	state->targets[1].label = "GS";
@@ -865,6 +931,7 @@ void HorizonProfiler::Start()
 
 void HorizonProfiler::Stop()
 {
+	std::lock_guard lock(s_lifecycle_mutex);
 	if (!s_state)
 		return;
 

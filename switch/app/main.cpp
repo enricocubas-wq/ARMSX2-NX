@@ -206,7 +206,8 @@ namespace
 		const bool thread_tuning = GetTuningToggle("ThreadTuning", true, &dirty);
 		const bool code_page_read_backpatch = GetTuningToggle("CodePageReadBackpatch", true, &dirty);
 		const bool perf_log = GetTuningToggle("PerfLog", true, &dirty);
-		const bool profiler = GetTuningToggle("Profiler", true, &dirty);
+		// Not written to the ini, so a later build can change the default for everyone.
+		const bool profiler = s_settings_interface->GetBoolValue(TUNING_SETTINGS_SECTION, "Profiler", true);
 		if (dirty)
 			s_settings_interface->Save();
 
@@ -218,7 +219,8 @@ namespace
 			code_page_read_backpatch, perf_log, profiler);
 
 		// Diagnostic sampling of the EE/GS/VU threads ("[PROF]" lines in the log). Costs about
-		// 1% of speed while a game runs; set Profiler = false in armsx2.ini to turn it off.
+		// 1% of speed while a game runs; add Profiler = false under [Horizon] in armsx2.ini to
+		// turn it off.
 		if (profiler)
 			HorizonProfiler::Start();
 	}

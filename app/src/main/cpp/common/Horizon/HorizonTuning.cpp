@@ -180,6 +180,11 @@ namespace Horizon
 		record.handle = threadGetCurHandle();
 		if (R_FAILED(svcGetThreadId(&record.thread_id, record.handle)))
 			return;
+		if (const ::Thread* const self = threadGetSelf(); self && self->stack_mirror && self->stack_sz)
+		{
+			record.stack_begin = reinterpret_cast<u64>(self->stack_mirror);
+			record.stack_end = record.stack_begin + self->stack_sz;
+		}
 
 		std::lock_guard lock(s_registry_mutex);
 		for (size_t i = 0; i < s_registry_count; i++)

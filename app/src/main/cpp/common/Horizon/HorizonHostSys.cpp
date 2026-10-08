@@ -223,7 +223,9 @@ namespace
 	// attribute set; anything else is refused as a whole with InvalidCurrentMemory. That is
 	// exactly what the reset of EE RAM looks like while some of its pages are write-protected
 	// code pages. This redoes such a call one uniform kernel memory block at a time.
-	bool ReprotectByRuns(void* baseaddr, size_t size, u32 prot)
+	// restore_aliases: the range is canonical fastmem memory being made writable; once a run is
+	// writable, its fastmem aliases may be mapped writable again (as after a successful bulk call).
+	bool ReprotectByRuns(void* baseaddr, size_t size, u32 prot, bool restore_aliases)
 	{
 		Horizon::ReprotectStats& stats = Horizon::GetReprotectStats();
 		stats.split_calls.fetch_add(1, std::memory_order_relaxed);
@@ -243,9 +245,11 @@ namespace
 			}
 
 			const uptr run_end = std::min<uptr>(end, info.addr + info.size);
+			bool run_ok = true;
 			if (info.perm != prot)
 			{
-				if (R_SUCCEEDED(svcSetMemoryPermission(reinterpret_cast<void*>(cur), run_end - cur, prot)))
+				run_ok = R_SUCCEEDED(svcSetMemoryPermission(reinterpret_cast<void*>(cur), run_end - cur, prot));
+				if (run_ok)
 				{
 					stats.split_runs.fetch_add(1, std::memory_order_relaxed);
 				}
@@ -255,6 +259,8 @@ namespace
 					ok = false;
 				}
 			}
+			if (run_ok && restore_aliases)
+				HorizonFastmem::RestoreCanonicalProtection(reinterpret_cast<void*>(cur), run_end - cur);
 			cur = run_end;
 		}
 		return ok;
@@ -290,38 +296,38 @@ void HostSys::MemProtect(void* baseaddr, size_t size, const PageProtectionMode& 
 	}
 
 	const u32 prot = HorizonProt(mode);
-	Result rc = svcSetMemoryPermission(baseaddr, size, prot);
-	if (R_FAILED(rc) && size > __pagesize)
+	const bool restore_aliases = canonical && mode.CanWrite();
+	const Result rc = svcSetMemoryPermission(baseaddr, size, prot);
+	if (R_SUCCEEDED(rc))
 	{
-		const Result bulk_rc = rc;
-		if (ReprotectByRuns(baseaddr, size, prot))
-			rc = 0;
+		if (restore_aliases)
+			HorizonFastmem::RestoreCanonicalProtection(baseaddr, size);
+		return;
+	}
+
+	if (size > __pagesize)
+	{
+		// Restores the aliases of every run it manages to reprotect, even if some run fails.
+		const bool all_ok = ReprotectByRuns(baseaddr, size, prot, restore_aliases);
 
 		static bool s_split_logged = false;
 		if (!s_split_logged)
 		{
 			Console.WriteLn("HostSys::MemProtect: bulk svcSetMemoryPermission(%p, 0x%zx) was refused (0x%08x); "
 							"reprotected piecewise instead (%s). Further occurrences are only counted.",
-				baseaddr, size, static_cast<u32>(bulk_rc), R_SUCCEEDED(rc) ? "ok" : "with failures");
+				baseaddr, size, static_cast<u32>(rc), all_ok ? "ok" : "with failures");
 			s_split_logged = true;
 		}
+		return;
 	}
 
-	if (R_FAILED(rc))
+	Horizon::GetReprotectStats().failures.fetch_add(1, std::memory_order_relaxed);
+	static bool s_warned = false;
+	if (!s_warned)
 	{
-		static bool s_warned = false;
-		if (!s_warned)
-		{
-			Console.Warning("HostSys::MemProtect: svcSetMemoryPermission(%p, 0x%zx) failed: 0x%08x "
-							"(continuing with further failures suppressed)", baseaddr, size, static_cast<u32>(rc));
-			s_warned = true;
-		}
-		if (size <= __pagesize)
-			Horizon::GetReprotectStats().failures.fetch_add(1, std::memory_order_relaxed);
-	}
-	else if (canonical && mode.CanWrite())
-	{
-		HorizonFastmem::RestoreCanonicalProtection(baseaddr, size);
+		Console.Warning("HostSys::MemProtect: svcSetMemoryPermission(%p, 0x%zx) failed: 0x%08x "
+						"(continuing with further failures suppressed)", baseaddr, size, static_cast<u32>(rc));
+		s_warned = true;
 	}
 }
 

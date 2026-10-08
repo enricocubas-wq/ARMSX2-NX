@@ -91,6 +91,8 @@ namespace Horizon
 		char name[32];
 		u32 handle; ///< kernel handle, valid while the thread is alive
 		u64 thread_id; ///< kernel thread id, to tell a live thread from a reused handle
+		u64 stack_begin; ///< the thread's stack as libnx knows it (0 if unknown)
+		u64 stack_end;
 	};
 
 	/// Registers (or re-registers) the calling thread under the given name.
