@@ -35,6 +35,10 @@ jobs:
 
       - name: Gradle (com cache)
         uses: gradle/actions/setup-gradle@v4
+        with:
+          # O repositório tem um wrapper de terceiros (SDL3) que a validação não conhece;
+          # o wrapper do Faxina é o mesmo do Gradle oficial (hash conferido pelo próprio log).
+          validate-wrappers: false
 
       - name: Testes do núcleo (varredura, duplicados, IMAP)
         run: ./gradlew :core:selfTest --stacktrace
