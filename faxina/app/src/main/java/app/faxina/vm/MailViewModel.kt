@@ -111,7 +111,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             .putString("email", acc.email).putString("provider", provider.name)
             .putString("host", host).putInt("port", port).putString("security", acc.security.name)
             .apply()
-        secure.put(KEY_PASS, cleanPass)
+        try {
+            secure.put(KEY_PASS, cleanPass)
+        } catch (e: Exception) {
+            _ui.value = MailUi.Failed("Este celular não conseguiu guardar a senha com segurança (${e.message ?: e.javaClass.simpleName}).", false)
+            return
+        }
         _account.value = acc
         scan()
     }

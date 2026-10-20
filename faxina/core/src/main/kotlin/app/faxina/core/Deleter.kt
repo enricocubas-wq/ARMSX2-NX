@@ -20,7 +20,7 @@ object Deleter {
         for (e in entries) {
             val success = try {
                 if (e.isDir) deleteTree(File(e.path).toPath()) else Files.deleteIfExists(File(e.path).toPath()).let { true }
-            } catch (_: IOException) { false } catch (_: SecurityException) { false }
+            } catch (_: Exception) { false }
             if (success) { freed += e.size; ok.add(e.path) } else bad.add(e.path)
             onProgress?.invoke(++i, entries.size)
         }

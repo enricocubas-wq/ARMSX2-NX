@@ -139,8 +139,9 @@ fun ReviewScreen(vm: MainViewModel, filter: ReviewFilter) {
     }
     val safe = visible.filter { it.risk == Risk.SAFE }
     val review = visible.filter { it.risk == Risk.REVIEW }
-    val visibleSelected = visible.sumOf { sel.bytes(it.id) }
-    val visibleSelectedCount = visible.sumOf { sel.count(it.id) }
+    // na tela completa o total conta cada arquivo uma vez só, mesmo que apareça em dois grupos
+    val visibleSelected = if (filter == ReviewFilter.ALL) sel.totalBytes else visible.sumOf { sel.bytes(it.id) }
+    val visibleSelectedCount = if (filter == ReviewFilter.ALL) sel.totalCount else visible.sumOf { sel.count(it.id) }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ScreenHeader(if (filter == ReviewFilter.MESSENGERS) "WhatsApp e Telegram" else "Limpeza", onBack = { vm.back() })

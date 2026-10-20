@@ -92,7 +92,7 @@ class Scanner(private val opts: ScanOptions, val progress: ScanProgress = ScanPr
                     for (p in stream) {
                         val attrs = try {
                             Files.readAttributes(p, BasicFileAttributes::class.java, LinkOption.NOFOLLOW_LINKS)
-                        } catch (_: IOException) { continue } catch (_: SecurityException) { continue }
+                        } catch (_: Exception) { continue }
                         if (attrs.isSymbolicLink) continue
                         val name = p.fileName.toString()
                         if (attrs.isDirectory) {
@@ -104,9 +104,8 @@ class Scanner(private val opts: ScanOptions, val progress: ScanProgress = ScanPr
                         }
                     }
                 }
-            } catch (_: IOException) {
-                node.unreadable = true
-            } catch (_: SecurityException) {
+            } catch (_: Exception) {
+                // IOException, SecurityException, DirectoryIteratorException (arquivo sumiu no meio)...
                 node.unreadable = true
             }
             node.empty = ownFiles == 0L && !node.unreadable

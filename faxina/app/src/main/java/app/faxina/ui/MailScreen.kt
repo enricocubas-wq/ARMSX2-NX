@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -109,7 +110,7 @@ private fun MailSetup(vm: MailViewModel) {
     var port by rememberSaveable { mutableStateOf((account?.port ?: 993).toString()) }
 
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp),
+        Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("Conecte seu e-mail", style = MaterialTheme.typography.headlineMedium)
@@ -273,11 +274,12 @@ private fun MailReady(report: MailReport, vm: MailViewModel) {
 
     val uids = remember(report, presets, senders, bigPicked) { vm.selectedUids(report) }
     val bytes = remember(report, uids) { report.bytesOf(uids) }
-    val shown = remember(report) {
+    // tamanho e quantidade de cada atalho, calculados uma vez por análise
+    val presetStats = remember(report) {
         buildList {
             if (report.isGmail) { add(MailPreset.PROMOTIONS); add(MailPreset.SOCIAL) }
             add(MailPreset.NEWSLETTERS); add(MailPreset.BIG); add(MailPreset.OLD_READ)
-        }.filter { report.countFor(it) > 0 }
+        }.map { Triple(it, report.countFor(it), report.bytesFor(it)) }.filter { it.second > 0 }
     }
     val trashTotal = report.trashBytes + report.spamBytes
     val canDelete = uids.isNotEmpty()
@@ -329,12 +331,12 @@ private fun MailReady(report: MailReport, vm: MailViewModel) {
                     }
                 }
             }
-            if (shown.isNotEmpty()) {
+            if (presetStats.isNotEmpty()) {
                 item { SectionLabel("Limpeza rápida", Modifier.padding(top = 8.dp)) }
-                items(shown, key = { it.name }) { p ->
+                items(presetStats, key = { it.first.name }) { (p, count, size) ->
                     SelectRow(
                         title = presetTitle(p, report.isGmail),
-                        subtitle = "${formatBytes(report.bytesFor(p))} • ${formatCount(report.countFor(p).toLong())} e-mails\n${presetHint(p)}",
+                        subtitle = "${formatBytes(size)} • ${formatCount(count.toLong())} e-mails\n${presetHint(p)}",
                         checked = p in presets,
                         onToggle = { vm.togglePreset(p) },
                     )

@@ -24,6 +24,7 @@ import app.faxina.data.MediaRefresh
 import app.faxina.data.Perms
 import app.faxina.data.StorageInfo
 import app.faxina.data.StorageUsage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -64,7 +65,7 @@ sealed interface DeleteUi {
     data class Running(val done: Int, val total: Int) : DeleteUi
 }
 
-class SelStats(val totalBytes: Long, val foundBytes: Long, val perGroup: Map<GroupId, Pair<Int, Long>>) {
+class SelStats(val totalBytes: Long, val totalCount: Int, val foundBytes: Long, val perGroup: Map<GroupId, Pair<Int, Long>>) {
     fun count(id: GroupId) = perGroup[id]?.first ?: 0
     fun bytes(id: GroupId) = perGroup[id]?.second ?: 0L
 }
@@ -202,6 +203,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 _scan.value = ScanUi.Done
                 refreshUsage()
                 startDuplicates(result)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _scan.value = ScanUi.Idle
+                _toast.value = "Não consegui analisar o armazenamento: ${e.message ?: e.javaClass.simpleName}"
             } finally {
                 ticker.cancel()
             }
@@ -233,6 +239,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     _groups.update { it.filter { g -> g.id != GroupId.DUPLICATES } + group }
                     _selected.update { it + group.items.filter { e -> !e.keep }.map { e -> e.path } }
                 }
+                _dup.value = DupUi.Done
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 _dup.value = DupUi.Done
             } finally {
                 ticker.cancel()
@@ -270,6 +280,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val seen = HashSet<String>()
         val seenAll = HashSet<String>()
         var total = 0L
+        var totalCount = 0
         var found = 0L
         for (g in gs) {
             var c = 0
@@ -280,13 +291,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 if (e.path in sel) {
                     c++
                     b += e.size
-                    if (seen.add(e.path)) total += e.size
+                    if (seen.add(e.path)) { total += e.size; totalCount++ }
                 }
             }
             per[g.id] = c to b
         }
-        SelStats(total, found, per)
-    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, SelStats(0, 0, emptyMap()))
+        SelStats(total, totalCount, found, per)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.Eagerly, SelStats(0, 0, 0, emptyMap()))
 
     fun toggle(path: String) = _selected.update { if (path in it) it - path else it + path }
 
