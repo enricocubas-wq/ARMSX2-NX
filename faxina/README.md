@@ -44,6 +44,15 @@ A senha fica cifrada com uma chave do Android Keystore e só é usada para falar
 - **Pastas `Android/data`** de outros apps ficam bloqueadas no Android 11+; por isso não aparecem na limpeza (o cache delas entra pelo botão acima).
 - Apagar é **definitivo** (não vai para a lixeira). Por isso sempre há uma lista e uma confirmação antes.
 
+## O que foi (e não foi) testado
+
+- **Testado automaticamente a cada build (29 verificações):** varredura e regras de lixo, WhatsApp/Telegram, pastas vazias, duplicados
+  (inclusive "mesmo tamanho, miolo diferente"), remoção, leitura de e-mail em lotes, categorias do Gmail, MOVE e fallback sem MOVE,
+  esvaziar lixeira, proteção de e-mails com estrela e erro de senha. O e-mail é testado contra um servidor IMAP de brinquedo, não contra uma conta real.
+- **Compila em release (R8) no GitHub**, mas as telas ainda não foram exercitadas num aparelho real. Se algo travar ou ficar estranho no seu
+  modelo de celular, abra uma *issue* com a versão do Android e o que aconteceu.
+- Outlook/Hotmail podem exigir configurações extras da Microsoft para IMAP; o Gmail é o caminho mais bem coberto.
+
 ## Para quem for compilar
 
 ```bash
