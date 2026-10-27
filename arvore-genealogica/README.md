@@ -27,6 +27,22 @@ Observações:
 - Os dados ficam guardados por *endereço do site*. Em `usuario.github.io`, outros sites seus no GitHub Pages compartilham o mesmo armazenamento. Se isso importar, use um domínio próprio para o app.
 - Atualizações: o app abre com a versão guardada e baixa a nova em segundo plano, então a versão nova aparece na abertura seguinte.
 
+## APK para Android
+
+Download direto (Android): **https://github.com/enricocubas-wq/ARMSX2-NX/releases/download/arvore-genealogica-apk/arvore-genealogica.apk**
+
+1. Baixe o arquivo no celular e toque nele.
+2. Se o Android pedir, permita instalar apps desta fonte (navegador ou gerenciador de arquivos). Isso vale só para este app.
+3. Abra o app **Árvore**.
+
+Como é feito: o app web fica **dentro** do APK (`android/`), exibido por uma WebView. Funciona sem internet e **sem pedir nenhuma permissão**, nem a de internet; o backup automático do Android também está desligado, então os dados não vão para a nuvem do Google. Para o que a WebView não faz sozinha, a casca nativa cuida de `confirm()`, da escolha de arquivo (Importar) e do "Salvar como" do Android (Exportar GEDCOM e Backup).
+
+O APK é compilado pelo GitHub Actions (`.github/workflows/arvore-genealogica-apk.yml`) a cada alteração em `arvore-genealogica/` e publicado na release `arvore-genealogica-apk` (marcada como pré-lançamento para não virar a "última release" do repositório do emulador). Para compilar à mão: `sh android/sync-web.sh` e depois `gradle assembleRelease` dentro de `android/` (precisa de JDK 17 e Android SDK 34).
+
+Observações:
+- É assinado com uma chave própria, criada na primeira compilação e guardada no cache do GitHub Actions. Enquanto o cache existir, um APK novo atualiza o app **sem apagar os dados**. Se o cache for perdido, o Android recusa a atualização por cima: faça **Backup**, desinstale, instale e use **Importar**.
+- Só para Android. No iPhone, use o link do PWA (seção anterior).
+
 ## O que faz
 
 - **Cadastro inicial**: você, seu pai e sua mãe. A árvore já aparece.
