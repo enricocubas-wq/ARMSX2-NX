@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Zine Maker</title>
+  <meta name="description" content="Monte livretos de zine (miolo e capa) prontos para imprimir em casa: ordem das páginas, frente e verso e refile calculados automaticamente. Funciona offline, no navegador.">
+  <meta name="theme-color" content="#f2ecdf">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip" href="#pages">Pular para as páginas</a>
+
+  <header class="top">
+    <div class="brand">
+      <h1 class="logo">ZINE<span aria-hidden="true">/</span>MAKER</h1>
+      <p class="tag">Da página escaneada ao PDF pronto pra imprimir, dobrar e grampear.</p>
+    </div>
+    <div class="top-actions">
+      <label class="title-field">
+        <span>Nome do zine</span>
+        <input id="title" type="text" autocomplete="off" maxlength="60" placeholder="meu-zine">
+      </label>
+      <button class="btn ghost" id="btn-help" type="button">Como funciona</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <div class="col col-main">
+
+      <!-- 1 · PÁGINAS -->
+      <section class="card" id="pages" aria-labelledby="h-pages">
+        <header class="card-h">
+          <span class="step" aria-hidden="true">1</span>
+          <h2 id="h-pages">Páginas do miolo</h2>
+          <div class="card-tools">
+            <button class="btn" id="btn-add" type="button">+ Arquivos</button>
+            <button class="btn ghost" id="btn-blank" type="button">+ Em branco</button>
+            <button class="btn ghost" id="btn-sample" type="button">Exemplo</button>
+            <button class="btn ghost danger" id="btn-clear" type="button">Limpar</button>
+          </div>
+        </header>
+
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Adicionar arquivos de página">
+          <div class="drop-art" aria-hidden="true">
+            <i></i><i></i><i></i>
+          </div>
+          <p class="drop-big">Joga as páginas aqui.</p>
+          <p class="drop-small">JPG, PNG ou PDF, na ordem do projeto (página 1, 2, 3…). Pode soltar vários de uma vez: os nomes são ordenados do jeito certo (<code>pag2</code> antes de <code>pag10</code>). Tudo roda no seu navegador; nada é enviado a lugar nenhum.</p>
+        </div>
+
+        <ol class="tray" id="tray" aria-label="Páginas do miolo, em ordem"></ol>
+        <p class="note" id="pad-note" role="status"></p>
+      </section>
+
+      <!-- CAPA -->
+      <section class="card" id="covers" aria-labelledby="h-covers">
+        <header class="card-h">
+          <span class="step" aria-hidden="true">2</span>
+          <h2 id="h-covers">Capa</h2>
+          <p class="card-sub">Solte um PDF de 2 páginas (capa + contracapa) ou de 4 páginas para preencher tudo de uma vez.</p>
+        </header>
+        <div class="slots" id="slots"></div>
+      </section>
+
+      <!-- PRÉVIA -->
+      <section class="card" id="preview" aria-labelledby="h-preview">
+        <header class="card-h">
+          <span class="step" aria-hidden="true">3</span>
+          <h2 id="h-preview">Como vai sair da impressora</h2>
+          <div class="tabs" id="tabs" role="tablist" aria-label="Qual PDF visualizar"></div>
+        </header>
+        <div class="preview-body" id="preview-body" aria-live="polite">
+          <p class="empty">Adicione páginas para ver as folhas montadas.</p>
+        </div>
+      </section>
+    </div>
+
+    <aside class="col col-side" aria-label="Configurações">
+
+      <!-- FORMATO -->
+      <section class="card" id="format" aria-labelledby="h-format">
+        <header class="card-h"><h2 id="h-format">Formato</h2>
+          <button class="link" id="btn-reset" type="button">restaurar padrão</button>
+        </header>
+
+        <div class="field">
+          <label for="f-sheet">Folha de impressão</label>
+          <select id="f-sheet" data-k="sheet"></select>
+          <div class="inline" data-show-if="sheet=custom">
+            <label class="mini">largura <input type="number" data-k="customSheet.w" min="60" max="1200" step="0.1"> mm</label>
+            <label class="mini">altura <input type="number" data-k="customSheet.h" min="60" max="1200" step="0.1"> mm</label>
+          </div>
+          <p class="hint" id="h-sheet"></p>
+        </div>
+
+        <fieldset class="field choice">
+          <legend>Estrutura</legend>
+          <label class="opt">
+            <input type="radio" name="mode" value="separate" data-k="mode">
+            <span><b>Miolo + capa à parte</b><small>capa em papel mais grosso, dois PDFs</small></span>
+          </label>
+          <label class="opt">
+            <input type="radio" name="mode" value="together" data-k="mode">
+            <span><b>Tudo num livreto só</b><small>capa é a primeira/última página, um PDF</small></span>
+          </label>
+        </fieldset>
+
+        <div class="field">
+          <label for="f-paper-in">Papel do miolo</label>
+          <select id="f-paper-in" data-k="paperInner"></select>
+          <label class="mini" data-show-if="paperInner=custom">espessura <input type="number" data-k="customInnerMm" min="0.03" max="1" step="0.01"> mm</label>
+        </div>
+        <div class="field" data-show-if="mode=separate">
+          <label for="f-paper-cv">Papel da capa</label>
+          <select id="f-paper-cv" data-k="paperCover"></select>
+          <label class="mini" data-show-if="paperCover=custom">espessura <input type="number" data-k="customCoverMm" min="0.03" max="1" step="0.01"> mm</label>
+        </div>
+
+        <div class="field">
+          <label for="f-rtl">Sentido de leitura</label>
+          <select id="f-rtl" data-k="rtl" data-type="bool">
+            <option value="false">Esquerda → direita (padrão)</option>
+            <option value="true">Direita → esquerda (mangá, árabe, hebraico)</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="f-duplex">Impressão frente e verso</label>
+          <select id="f-duplex" data-k="duplex">
+            <option value="short">Virar pela borda curta (o mais comum)</option>
+            <option value="long">Virar pela borda longa</option>
+          </select>
+          <p class="hint">Na dúvida, imprima a <b>folha de teste</b> antes da tiragem.</p>
+        </div>
+      </section>
+
+      <!-- REFILE -->
+      <section class="card card-accent" id="trim" aria-labelledby="h-trim">
+        <header class="card-h"><h2 id="h-trim">Refile (sobra)</h2></header>
+
+        <label class="switch">
+          <input type="checkbox" data-k="trim.enabled">
+          <span class="track" aria-hidden="true"></span>
+          <span class="switch-t"><b>Prever refile</b>
+            <small>reserva uma sobra na lateral para cortar depois de dobrar e grampear</small></span>
+        </label>
+
+        <div class="trim-body" data-show-if="trim.enabled">
+          <p class="explain">Quanto mais folhas, mais as de dentro “saem” na borda. O app calcula isso e já posiciona a arte para que, <b>depois de um corte só</b>, todas as páginas fiquem com a mesma margem.</p>
+
+          <div class="field">
+            <label for="f-margin">Sobra mínima <span class="unit">mm</span></label>
+            <input id="f-margin" type="number" data-k="trim.margin" min="0" max="20" step="0.5">
+            <p class="hint">É o que sai da folha mais externa. Impressoras caseiras costumam não imprimir nos 3–5 mm da borda: se a arte vai até a lateral, use 5 mm ou mais.</p>
+          </div>
+
+          <div class="field">
+            <label for="f-tb">Refilar também topo e base <span class="unit">mm por lado</span></label>
+            <input id="f-tb" type="number" data-k="trim.topBottom" min="0" max="15" step="0.5">
+            <p class="hint">0 = só a lateral (o topo e a base são as bordas de fábrica do papel).</p>
+          </div>
+
+          <label class="check"><input type="checkbox" data-k="trim.marks"> Marcas de corte na linha de refile</label>
+          <label class="check"><input type="checkbox" data-k="trim.creep"> Compensar a espessura do papel (creep)</label>
+
+          <div class="field" data-show-if="trim.creep">
+            <label for="f-creep">Intensidade do creep <span class="unit">×</span></label>
+            <input id="f-creep" type="number" data-k="creepFactor" min="0.2" max="10" step="0.1">
+            <p class="hint">1 = conta teórica. O padrão (1,2) segue a prática de gráficas, que medem um pouco mais que a teoria.</p>
+            <details class="calib">
+              <summary>Calibrar com um zine que eu já fiz</summary>
+              <p class="hint">Dobre e grampeie um zine do mesmo papel e meça quanto a folha de dentro <b>passa</b> da folha de fora.</p>
+              <div class="inline">
+                <label class="mini">folhas <input id="cal-n" type="number" min="2" max="40" step="1" value="6"></label>
+                <label class="mini">sobrou <input id="cal-mm" type="number" min="0" max="20" step="0.1" value="1"> mm</label>
+                <button class="btn small" id="btn-cal" type="button">Aplicar</button>
+              </div>
+            </details>
+          </div>
+
+          <div class="field">
+            <label for="f-fit">Como a página entra no espaço</label>
+            <select id="f-fit" data-k="fit">
+              <option value="contain">Caber inteira (nada é cortado)</option>
+              <option value="cover">Preencher (pode cortar bordas)</option>
+            </select>
+            <p class="hint">“Caber inteira” reduz a página só o suficiente para ela caber depois do refile (o resumo mostra a escala).</p>
+          </div>
+          <div class="field">
+            <label for="f-fill">A sobra fica</label>
+            <select id="f-fill" data-k="fill">
+              <option value="white">Branca</option>
+              <option value="mirror">Espelhada (continua a arte até a borda)</option>
+            </select>
+            <p class="hint">Use <b>espelhada</b> em páginas com fundo colorido ou arte até a borda (capas!). Em scans de fundo branco, branca já está ótimo.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- RESUMO -->
+      <section class="card" id="summary" aria-labelledby="h-summary">
+        <header class="card-h"><h2 id="h-summary">Resumo</h2></header>
+        <div id="summary-body" aria-live="polite"></div>
+      </section>
+
+      <!-- COMO IMPRIMIR -->
+      <section class="card" id="how-card" aria-labelledby="h-how">
+        <header class="card-h"><h2 id="h-how">Como imprimir e montar</h2></header>
+        <div id="how-body" class="how"></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="foot">
+    <p>Zine Maker · código aberto · seus arquivos nunca saem do seu computador.</p>
+  </footer>
+
+  <div class="actionbar" id="actionbar" role="region" aria-label="Baixar PDFs">
+    <p class="ab-sum" id="ab-sum" aria-live="polite"></p>
+    <div class="export-btns" id="export-btns"></div>
+  </div>
+
+  <dialog id="help">
+    <form method="dialog">
+      <h2>Como funciona</h2>
+      <ol>
+        <li><b>Jogue as páginas</b> do miolo (JPG, PNG ou PDF) na ordem do projeto. O app só trabalha com <b>múltiplos de 4</b>: se faltar, completa com páginas em branco.</li>
+        <li><b>Coloque a capa</b>: capa e contracapa (e, se quiser, a 2ª e a 3ª capa).</li>
+        <li>Escolha a folha (A4 vira livreto A5) e, se for <b>refilar</b>, ligue “Prever refile”.</li>
+        <li><b>Baixe o PDF</b>, imprima em tamanho real, frente e verso, dobre, grampeie e (se previu) corte a lateral.</li>
+      </ol>
+      <p>Dica de curso: baixe a <b>folha de teste</b> primeiro. Ela mostra para que lado a sua impressora vira o papel e quanto da borda ela deixa sem imprimir.</p>
+      <menu><button class="btn" value="ok">Entendi</button></menu>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div class="dropveil" id="dropveil" aria-hidden="true"><b>Solte para adicionar</b></div>
+  <input type="file" id="file-input" multiple accept="image/*,application/pdf,.pdf" hidden>
+
+  <script src="vendor/pdf-lib.min.js"></script>
+  <script src="vendor/pdf.min.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/exif.js"></script>
+  <script src="js/pdfbuilder.js"></script>
+  <script src="js/sources.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "zine-maker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monta livretos de zine (miolo e capa) prontos para imprimir em casa. Roda 100% no navegador.",
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "test:e2e": "node tests/e2e.js",
+    "serve": "node tools/serve.js",
+    "build": "node tools/build-single.js"
+  },
+  "devDependencies": {
+    "pdf-lib": "1.17.1"
+  }
+}

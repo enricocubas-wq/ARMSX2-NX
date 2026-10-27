@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#f2ecdf"/>
+  <rect x="56" y="76" width="400" height="360" fill="#17140f"/>
+  <g transform="translate(256 256) rotate(-4)">
+    <rect x="-176" y="-146" width="168" height="292" fill="#fffdf6" stroke="#17140f" stroke-width="10"/>
+    <rect x="8" y="-146" width="168" height="292" fill="#ffe14d" stroke="#17140f" stroke-width="10"/>
+    <!-- Z e M desenhados como formas (sem depender de fontes) -->
+    <path transform="translate(-92 6) scale(1.5)" fill="#17140f" d="M-40 -50H40V-30L-14 30H40V50H-40V30L14 -30H-40Z"/>
+    <path transform="translate(92 6) scale(1.5)" fill="#d12f20" d="M-44 50V-50H-22L0 -8L22 -50H44V50H24V-8L0 34L-24 -8V50Z"/>
+    <path d="M0 -176V176" stroke="#17140f" stroke-width="6" stroke-dasharray="14 12"/>
+    <rect x="-14" y="-62" width="28" height="12" fill="#d12f20" stroke="#17140f" stroke-width="3"/>
+    <rect x="-14" y="50" width="28" height="12" fill="#d12f20" stroke="#17140f" stroke-width="3"/>
+  </g>
+</svg>
