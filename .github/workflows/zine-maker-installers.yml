@@ -20,9 +20,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  prepare:
+    name: Create download page
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Recreate pre-release (empty)
+        run: |
+          cat > notes.md <<NOTES
+          ## Zine Maker: instaladores
+
+          **Windows:** baixe o arquivo \`.exe\` e dê duplo clique. Se aparecer "O Windows protegeu o computador", clique em **Mais informações** e depois em **Executar assim mesmo**.
+
+          **Mac:** baixe o arquivo \`.dmg\`, abra e arraste o Zine Maker para Aplicativos. Na primeira vez, **clique com o botão direito no app e escolha Abrir** (depois, **Abrir** de novo na janela de aviso). Nas próximas vezes abre normalmente.
+
+          O app roda 100% no seu computador, sem internet, e nenhum arquivo seu é enviado a lugar nenhum.
+
+          Esses avisos aparecem porque o app não tem assinatura paga (Windows e Apple cobram certificado). Não indicam problema no arquivo.
+
+          Versão gerada a partir do commit \`${GITHUB_SHA:0:7}\`. Cada instalador aparece aqui assim que fica pronto.
+          NOTES
+          gh release delete zine-maker-latest --cleanup-tag --yes || true
+          gh release create zine-maker-latest \
+            --prerelease --latest=false \
+            --target "$GITHUB_SHA" \
+            --title "Zine Maker (instaladores para Windows e Mac)" \
+            --notes-file notes.md
+
   build:
     name: Build (${{ matrix.name }})
+    needs: prepare
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -64,38 +98,9 @@ jobs:
           path: ${{ matrix.pattern }}
           if-no-files-found: error
 
-  release:
-    name: Publish download page
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    env:
-      GH_TOKEN: ${{ github.token }}
-      GH_REPO: ${{ github.repository }}
-    steps:
-      - uses: actions/download-artifact@v5
-        with:
-          path: installers
-          merge-multiple: true
-
-      - name: Publish pre-release
-        run: |
-          ls -la installers
-          cat > notes.md <<'NOTES'
-          ## Zine Maker: instaladores
-
-          **Windows:** baixe o arquivo `.exe` e dê duplo clique. Se aparecer "O Windows protegeu o computador", clique em **Mais informações** e depois em **Executar assim mesmo**.
-
-          **Mac:** baixe o arquivo `.dmg`, abra e arraste o Zine Maker para Aplicativos. Na primeira vez, **clique com o botão direito no app e escolha Abrir** (depois, **Abrir** de novo na janela de aviso). Nas próximas vezes abre normalmente.
-
-          O app roda 100% no seu computador, sem internet, e nenhum arquivo seu é enviado a lugar nenhum.
-
-          Esses avisos aparecem porque o app não tem assinatura paga (Windows e Apple cobram certificado). Não indicam problema no arquivo.
-          NOTES
-          gh release delete zine-maker-latest --cleanup-tag --yes || true
-          gh release create zine-maker-latest installers/* \
-            --prerelease --latest=false \
-            --target "$GITHUB_SHA" \
-            --title "Zine Maker (instaladores para Windows e Mac)" \
-            --notes-file notes.md
+      - name: Add to download page
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release upload zine-maker-latest ${{ matrix.pattern }} --clobber
