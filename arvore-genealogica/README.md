@@ -27,6 +27,17 @@ Observações:
 - Os dados ficam guardados por *endereço do site*. Em `usuario.github.io`, outros sites seus no GitHub Pages compartilham o mesmo armazenamento. Se isso importar, use um domínio próprio para o app.
 - Atualizações: o app abre com a versão guardada e baixa a nova em segundo plano, então a versão nova aparece na abertura seguinte.
 
+## Computador (Windows, Mac, Linux)
+
+Download direto: **https://github.com/enricocubas-wq/ARMSX2-NX/releases/download/arvore-genealogica-apk/arvore-genealogica-pc.zip**
+
+1. **Extraia tudo** do `.zip` (Windows: botão direito > *Extrair tudo*). Não abra de dentro do zip.
+2. Dê dois cliques em `index.html`. Abre no navegador (Chrome, Edge ou Firefox), sem instalar nada e sem internet.
+
+Os dados ficam no navegador daquele computador. Faça **Backup** de vez em quando, principalmente antes de mudar a pasta de lugar ou limpar os dados do navegador. Para levar a árvore entre celular e computador, use **Backup** em um e **Importar** no outro.
+
+Alternativa sem baixar nada: se o GitHub Pages estiver ligado (veja a seção do celular), o mesmo app abre pelo link no navegador do computador, e o Chrome/Edge permitem instalá-lo como aplicativo (ícone na barra de endereço).
+
 ## APK para Android
 
 Download direto (Android): **https://github.com/enricocubas-wq/ARMSX2-NX/releases/download/arvore-genealogica-apk/arvore-genealogica.apk**

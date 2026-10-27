@@ -1,7 +1,7 @@
 name: APK da árvore genealógica
 
-# Compila o app Android (arvore-genealogica/android) e publica o APK numa release
-# chamada "arvore-genealogica-apk", com link direto para baixar no celular.
+# Compila o app Android (arvore-genealogica/android) e publica, numa release chamada
+# "arvore-genealogica-apk", o APK (celular) e um .zip da versão para computador.
 
 on:
   push:
@@ -87,7 +87,17 @@ jobs:
           ls -l "$APK"
           "$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner" verify --verbose --print-certs "$APK" | head -8
 
-      - name: Publicar o APK numa release
+      - name: Montar o pacote para computador (.zip)
+        run: |
+          PKG="$RUNNER_TEMP/pc/arvore-genealogica"
+          mkdir -p "$PKG"
+          cd arvore-genealogica
+          cp -r index.html manifest.webmanifest css js vendor icons "$PKG/"
+          cp pc/LEIA-ME.txt "$PKG/"
+          cd "$RUNNER_TEMP/pc" && zip -qr "$RUNNER_TEMP/arvore-genealogica-pc.zip" arvore-genealogica
+          unzip -l "$RUNNER_TEMP/arvore-genealogica-pc.zip" | tail -3
+
+      - name: Publicar o APK e o pacote para computador numa release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -96,8 +106,9 @@ jobs:
           cp arvore-genealogica/android/app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/arvore-genealogica.apk"
           gh release delete "$TAG" --yes --cleanup-tag || true
           # --prerelease: não vira a "última release" do repositório do emulador.
-          gh release create "$TAG" "$RUNNER_TEMP/arvore-genealogica.apk" \
+          gh release create "$TAG" "$RUNNER_TEMP/arvore-genealogica.apk" "$RUNNER_TEMP/arvore-genealogica-pc.zip" \
             --target "$GITHUB_SHA" --prerelease \
-            --title "Árvore genealógica (APK para Android)" \
-            --notes "APK da árvore genealógica (build ${{ github.run_number }}, commit ${GITHUB_SHA::7}). Baixe no celular, abra o arquivo e permita a instalação de apps desta fonte. O app não tem permissão de internet: os dados ficam só no aparelho."
-          echo "Link: https://github.com/${{ github.repository }}/releases/download/$TAG/arvore-genealogica.apk"
+            --title "Árvore genealógica (APK e versão para computador)" \
+            --notes "Build ${{ github.run_number }}, commit ${GITHUB_SHA::7}. Celular Android: baixe arvore-genealogica.apk, abra o arquivo e permita a instalação de apps desta fonte. Computador: baixe arvore-genealogica-pc.zip, extraia tudo e abra o index.html. Em ambos os casos os dados ficam só no aparelho (o APK não tem permissão de internet)."
+          echo "APK: https://github.com/${{ github.repository }}/releases/download/$TAG/arvore-genealogica.apk"
+          echo "PC:  https://github.com/${{ github.repository }}/releases/download/$TAG/arvore-genealogica-pc.zip"

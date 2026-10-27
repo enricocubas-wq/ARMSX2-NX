@@ -35,7 +35,7 @@ jobs:
       - name: Montar o site (só o que o navegador precisa)
         run: |
           cp -r arvore-genealogica "$RUNNER_TEMP/site"
-          rm -rf "$RUNNER_TEMP/site/test" "$RUNNER_TEMP/site/android" "$RUNNER_TEMP/site/package.json" "$RUNNER_TEMP/site/README.md"
+          rm -rf "$RUNNER_TEMP/site/test" "$RUNNER_TEMP/site/android" "$RUNNER_TEMP/site/pc" "$RUNNER_TEMP/site/package.json" "$RUNNER_TEMP/site/README.md"
           touch "$RUNNER_TEMP/site/.nojekyll"
 
       - name: Publicar na branch gh-pages

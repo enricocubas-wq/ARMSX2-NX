@@ -1,0 +1,15 @@
+ÁRVORE GENEALÓGICA - versão para computador
+===========================================
+
+COMO ABRIR
+1. Extraia TODOS os arquivos deste .zip (Windows: botão direito > "Extrair tudo").
+   Não abra o index.html de dentro do .zip: ele precisa dos outros arquivos ao lado.
+2. Dê dois cliques em "index.html". Ele abre no seu navegador (Chrome, Edge ou Firefox).
+3. Cadastre seus dados e monte a árvore.
+
+SOBRE OS DADOS
+- Ficam só no navegador deste computador. Nada é enviado para a internet.
+- Limpar os dados do navegador apaga a árvore, e mudar a pasta de lugar pode fazer o
+  navegador não encontrá-la. Use "Backup" de vez em quando (e antes de mudar a pasta).
+- Para levar a árvore entre o celular e o computador: "Backup" em um, "Importar" no outro.
+- O CPF é opcional e nunca aparece nos cartões nem no arquivo GEDCOM, a menos que você peça.
