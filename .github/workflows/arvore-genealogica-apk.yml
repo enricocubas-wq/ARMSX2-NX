@@ -45,6 +45,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+          # Este build usa o "gradle" instalado acima, nunca um gradle-wrapper.jar. A validação
+          # varreria o repositório todo e reprovaria um wrapper de terceiros do emulador (SDL3).
+          validate-wrappers: false
 
       - name: Copiar o app web para dentro do projeto Android
         run: sh arvore-genealogica/android/sync-web.sh
