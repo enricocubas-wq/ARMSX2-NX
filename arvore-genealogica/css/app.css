@@ -109,7 +109,12 @@ button.linklike {
 @media (min-width: 860px) { .welcome { grid-template-columns: 1fr 1.5fr; gap: 40px; } }
 .welcome-intro p { color: var(--muted); max-width: 46ch; }
 .welcome-intro h2 { margin-bottom: 12px; font-size: 1.6rem; }
-.privacy { color: var(--ink); border-left: 3px solid var(--accent); padding-left: 12px; }
+.welcome-intro p.privacy {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--ink);
+}
 
 fieldset { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); margin: 0 0 16px; padding: 12px 16px 16px; min-width: 0; }
 legend { padding: 0 6px; font-weight: 600; }
