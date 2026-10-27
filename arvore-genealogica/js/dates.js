@@ -9,15 +9,27 @@
 
   const pad = (n, size) => String(n).padStart(size, '0');
 
-  // "12/03/1980", "03/1980" ou "1980" -> ISO parcial. "" -> "". Inválida -> null.
+  // Aceita o que a pessoa digita no celular, onde o teclado numérico não tem a barra:
+  //   com separador (/ . , - ou espaço): "02/05/1961", "02.05.1961", "5,1961"
+  //   só números: "02051961" (dd mm aaaa), "051961" (mm aaaa) e "1961" (só o ano)
+  // Devolve ISO parcial ("1961-05-02", "1961-05", "1961"), "" se vazio e null se inválida.
   function parseBR(text, today = new Date()) {
     const t = String(text || '').trim();
     if (!t) return '';
-    const m = /^(?:(?:(\d{1,2})\/)?(\d{1,2})\/)?(\d{4})$/.exec(t);
-    if (!m) return null;
-    const day = m[1] ? Number(m[1]) : null;
-    const month = m[2] ? Number(m[2]) : null;
-    const year = Number(m[3]);
+    const sep = '[\\s/.,-]+';
+    let day = null;
+    let month = null;
+    let year;
+    let m;
+    if ((m = new RegExp('^(\\d{1,2})' + sep + '(\\d{1,2})' + sep + '(\\d{4})$').exec(t))) [, day, month, year] = m;
+    else if ((m = new RegExp('^(\\d{1,2})' + sep + '(\\d{4})$').exec(t))) [, month, year] = m;
+    else if ((m = /^(\d{2})(\d{2})(\d{4})$/.exec(t))) [, day, month, year] = m;
+    else if ((m = /^(\d{2})(\d{4})$/.exec(t))) [, month, year] = m;
+    else if ((m = /^(\d{4})$/.exec(t))) [, year] = m;
+    else return null;
+    day = day === null ? null : Number(day);
+    month = month === null ? null : Number(month);
+    year = Number(year);
     if (year < 1000 || year > today.getFullYear()) return null;
     if (month !== null && (month < 1 || month > 12)) return null;
     if (day !== null) {
@@ -38,6 +50,12 @@
     const p = parts(iso);
     if (!p) return '';
     return [p.day, p.month, p.year].filter(Boolean).join('/');
+  }
+
+  // Arruma o texto digitado ("02051961" -> "02/05/1961"). Se não der para entender, devolve como veio.
+  function normalizeBR(text, today) {
+    const iso = parseBR(text, today);
+    return iso ? formatBR(iso) : String(text || '');
   }
 
   function year(iso) {
@@ -70,5 +88,5 @@
     return [m[3], month && pad(month, 2), day && pad(day, 2)].filter(Boolean).join('-');
   }
 
-  return { parseBR, formatBR, year, toGedcom, fromGedcom };
+  return { parseBR, formatBR, normalizeBR, year, toGedcom, fromGedcom };
 });

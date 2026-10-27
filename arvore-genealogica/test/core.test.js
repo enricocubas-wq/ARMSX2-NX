@@ -34,10 +34,31 @@ test('datas: aceita dd/mm/aaaa, mm/aaaa e aaaa', () => {
 });
 
 test('datas: rejeita inexistentes, futuras e mal formatadas', () => {
-  for (const bad of ['31/02/2000', '00/01/2000', '13/2000', '1/1/27', '12-03-1980', 'abc', '01/01/2027', '11/2026', '0999']) {
+  for (const bad of ['31/02/2000', '00/01/2000', '13/2000', '1/1/27', 'abc', '01/01/2027', '11/2026', '0999', '20511961', '0205196', '020519611', '02/05/61', '02//1961x']) {
     assert.equal(Dates.parseBR(bad, today), null, bad);
   }
   assert.equal(Dates.parseBR('27/10/2026', today), '2026-10-27');
+});
+
+test('datas: aceita só números e outros separadores (teclado numérico do celular não tem "/")', () => {
+  assert.equal(Dates.parseBR('02051961', today), '1961-05-02');
+  assert.equal(Dates.parseBR('25021962', today), '1962-02-25');
+  assert.equal(Dates.parseBR('051961', today), '1961-05');
+  for (const typed of ['02.05.1961', '02,05,1961', '02-05-1961', '02 05 1961', '2/5/1961', '2.5.1961']) {
+    assert.equal(Dates.parseBR(typed, today), '1961-05-02', typed);
+  }
+  assert.equal(Dates.parseBR('5,1961', today), '1961-05');
+  assert.equal(Dates.parseBR('  02051961  ', today), '1961-05-02');
+});
+
+test('datas: normalizeBR formata o que entende e deixa o resto como está', () => {
+  assert.equal(Dates.normalizeBR('02051961', today), '02/05/1961');
+  assert.equal(Dates.normalizeBR('2.5.1961', today), '02/05/1961');
+  assert.equal(Dates.normalizeBR('051961', today), '05/1961');
+  assert.equal(Dates.normalizeBR('1961', today), '1961');
+  assert.equal(Dates.normalizeBR('', today), '');
+  assert.equal(Dates.normalizeBR('31/02/2000', today), '31/02/2000');
+  assert.equal(Dates.normalizeBR('abc', today), 'abc');
 });
 
 test('datas: formata de volta e converte para GEDCOM', () => {

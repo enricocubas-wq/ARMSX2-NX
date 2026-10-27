@@ -156,17 +156,19 @@
     };
   }
 
+  const DATE_HELP = 'Digite dia, mês e ano (ex.: 02051961) ou só o ano. Não pode ser no futuro.';
+
   function validatePerson(raw, ignoreId, who) {
     const errors = [];
-    const fail = (name, message) => errors.push({ name, message: (who ? who + ': ' : '') + message });
+    const fail = (name, message) => errors.push({ name, message, who });
     const fields = { firstName: raw.firstName, lastName: raw.lastName, gender: raw.gender, birthPlace: raw.birthPlace, notes: raw.notes, birthDate: '', deathDate: '', cpf: '' };
 
     if (!raw.firstName) fail('firstName', 'informe o nome.');
     const birth = Dates.parseBR(raw.birthDate);
     const death = Dates.parseBR(raw.deathDate);
-    if (birth === null) fail('birthDate', 'data de nascimento inválida. Use dd/mm/aaaa, mm/aaaa ou só o ano (não pode ser no futuro).');
+    if (birth === null) fail('birthDate', 'data inválida. ' + DATE_HELP);
     else fields.birthDate = birth;
-    if (death === null) fail('deathDate', 'data de falecimento inválida. Use dd/mm/aaaa, mm/aaaa ou só o ano (não pode ser no futuro).');
+    if (death === null) fail('deathDate', 'data inválida. ' + DATE_HELP);
     else fields.deathDate = death;
     if (birth && death) {
       const n = Math.min(birth.length, death.length);
@@ -182,16 +184,36 @@
     return { fields, errors };
   }
 
+  const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+  // Cada erro aparece embaixo do próprio campo (no celular a lista no fim da tela ficava fora de vista).
+  // Erros sem campo (ex.: vínculo que criaria um ciclo) vão para a caixa geral.
   function showErrors(form, prefix, errorBox, errors) {
     for (const el of form.querySelectorAll('[aria-invalid]')) el.removeAttribute('aria-invalid');
-    errorBox.hidden = errors.length === 0;
-    errorBox.textContent = errors.map((e) => e.message.charAt(0).toUpperCase() + e.message.slice(1)).join('\n');
+    for (const el of form.querySelectorAll('.field-error')) el.remove();
+    const general = [];
+    let first = null;
     for (const e of errors) {
-      const field = form.elements[(e.prefix || prefix) + e.name];
-      if (field && field.setAttribute) field.setAttribute('aria-invalid', 'true');
+      const field = e.name ? form.elements[(e.prefix || prefix) + e.name] : null;
+      const label = field && field.closest ? field.closest('label') : null;
+      if (!label) {
+        general.push((e.who ? e.who + ': ' : '') + e.message);
+        continue;
+      }
+      field.setAttribute('aria-invalid', 'true');
+      const note = document.createElement('span');
+      note.className = 'field-error';
+      note.textContent = sentence(e.message);
+      label.append(note);
+      first = first || field;
     }
-    const first = errors[0] && form.elements[(errors[0].prefix || prefix) + errors[0].name];
-    if (first && first.focus) first.focus();
+    if (first) general.push('corrija os campos em vermelho.');
+    errorBox.hidden = general.length === 0;
+    errorBox.textContent = general.map(sentence).join('\n');
+    if (first) {
+      first.focus();
+      first.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
   }
 
   // ---------- cadastro inicial ----------
@@ -312,7 +334,7 @@
       $('#personDialog').close();
       render();
     } catch (err) {
-      showErrors(form, '', $('#personError'), [{ name: 'firstName', message: err.message }]);
+      showErrors(form, '', $('#personError'), [{ name: '', message: err.message }]);
     }
   }
 
@@ -415,10 +437,23 @@
     else if (target.hasAttribute('data-close')) target.closest('dialog').close();
   });
 
+  const isDateField = (el) => Boolean(el.name) && /(^|_)(birthDate|deathDate)$/.test(el.name);
+
   document.addEventListener('input', (event) => {
     const el = event.target;
     if (el.name && /(^|_)cpf$/.test(el.name)) el.value = Cpf.format(el.value);
-    if (el.hasAttribute && el.hasAttribute('aria-invalid')) el.removeAttribute('aria-invalid');
+    // 8 números seguidos só podem ser dd mm aaaa: já coloca as barras.
+    if (isDateField(el) && /^\d{8}$/.test(el.value)) el.value = Dates.normalizeBR(el.value);
+    if (el.hasAttribute && el.hasAttribute('aria-invalid')) {
+      el.removeAttribute('aria-invalid');
+      const note = el.closest('label') && el.closest('label').querySelector('.field-error');
+      if (note) note.remove();
+    }
+  });
+
+  // Ao sair do campo, arruma o que dá para entender: "2.5.1961" ou "051961" viram "02/05/1961" e "05/1961".
+  document.addEventListener('focusout', (event) => {
+    if (isDateField(event.target)) event.target.value = Dates.normalizeBR(event.target.value);
   });
 
   let resizeTimer = null;

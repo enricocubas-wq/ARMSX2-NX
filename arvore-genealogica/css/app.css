@@ -131,6 +131,7 @@ label input:not([type="radio"]):not([type="checkbox"]), select, textarea {
 }
 textarea { resize: vertical; }
 [aria-invalid="true"] { border-color: var(--danger) !important; }
+.field-error { color: var(--danger); font-size: 0.85rem; font-weight: 500; }
 .optional { font-weight: 400; font-size: 0.8rem; }
 .hint { margin: 10px 0 0; font-size: 0.85rem; color: var(--muted); }
 fieldset.radios { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin: 0; padding: 4px 12px 8px; background: transparent; }
