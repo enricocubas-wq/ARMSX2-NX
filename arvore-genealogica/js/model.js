@@ -240,6 +240,21 @@
     });
   }
 
+  // Quem digita no celular costuma usar só minúsculas ("enrico chinellato prado", "santos, sp").
+  // Só mexe em texto 100% minúsculo; o que já tem maiúscula fica como a pessoa escreveu.
+  const NAME_PARTICLES = new Set(['da', 'de', 'do', 'das', 'dos', 'e', 'di', 'du', 'del', 'della', 'van', 'von']);
+
+  function smartCase(text) {
+    const t = String(text == null ? '' : text);
+    if (!t || t !== t.toLowerCase()) return t;
+    return t.replace(/\p{L}+/gu, (word, at) => (at > 0 && NAME_PARTICLES.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)));
+  }
+
+  // Além da regra acima, a sigla depois da última vírgula ("Santos, sp") vira maiúscula.
+  function smartPlace(text) {
+    return smartCase(text).replace(/,\s*(\p{L}{2})\s*$/u, (all, uf) => ', ' + uf.toUpperCase());
+  }
+
   function clip(value) {
     return typeof value === 'string' ? value.slice(0, MAX_TEXT) : '';
   }
@@ -257,11 +272,11 @@
       if (!raw || typeof raw !== 'object') continue;
       const id = String(raw.id || key).slice(0, 64);
       tree.people[id] = blankPerson(id, {
-        firstName: clip(raw.firstName),
-        lastName: clip(raw.lastName),
+        firstName: smartCase(clip(raw.firstName)),
+        lastName: smartCase(clip(raw.lastName)),
         gender: raw.gender === 'M' || raw.gender === 'F' ? raw.gender : '',
         birthDate: cleanDate(raw.birthDate),
-        birthPlace: clip(raw.birthPlace),
+        birthPlace: smartPlace(clip(raw.birthPlace)),
         deathDate: cleanDate(raw.deathDate),
         cpf: clip(raw.cpf),
         notes: clip(raw.notes),
@@ -283,7 +298,32 @@
     return tree;
   }
 
+  // Pessoas da ascendência de quem criou a árvore que ainda não têm os dois pais cadastrados,
+  // das mais próximas às mais distantes: são os próximos nomes a descobrir.
+  function frontier(tree) {
+    const owner = tree.people[tree.ownerId];
+    if (!owner) return [];
+    const result = [];
+    const seen = new Set([owner.id]);
+    let level = [owner];
+    for (let generation = 0; level.length; generation++) {
+      const next = [];
+      for (const person of level) {
+        if (person.parentIds.length < 2) result.push({ person, generation, missing: 2 - person.parentIds.length });
+        for (const pid of person.parentIds) {
+          if (tree.people[pid] && !seen.has(pid)) {
+            seen.add(pid);
+            next.push(tree.people[pid]);
+          }
+        }
+      }
+      level = next;
+    }
+    return result;
+  }
+
   return {
+    smartCase, smartPlace, frontier,
     emptyTree, createPerson, updatePerson, removePerson, displayName,
     addParent, addSpouse, addChild, addSibling,
     childrenOf, spousesOf, siblingsOf, ancestorIds, descendantIds, coupleOrder,

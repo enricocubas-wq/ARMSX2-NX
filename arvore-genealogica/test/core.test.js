@@ -4,6 +4,7 @@ const Cpf = require('../js/cpf.js');
 const Dates = require('../js/dates.js');
 const Model = require('../js/model.js');
 const Gedcom = require('../js/gedcom.js');
+const Research = require('../js/research.js');
 
 const today = new Date(Date.UTC(2026, 9, 27));
 
@@ -279,5 +280,75 @@ test('GEDCOM: decodifica UTF-8, UTF-16 e Windows-1252', () => {
 test('GEDCOM: nomes com tags HTML são só texto (a interface é que precisa escapar)', () => {
   const ged = '0 HEAD\n0 @I1@ INDI\n1 NAME <img src=x onerror=alert(1)> /Teste/\n0 TRLR\n';
   const { tree } = Gedcom.importGedcom(ged);
-  assert.equal(Object.values(tree.people)[0].firstName, '<img src=x onerror=alert(1)>');
+  // continua sendo texto, nada é removido nem interpretado (a capitalização automática só muda as iniciais)
+  assert.match(Object.values(tree.people)[0].firstName, /^<img src=x onerror=alert\(1\)>$/i);
+});
+
+test('nomes: texto todo em minúsculas ganha iniciais maiúsculas; o resto fica como a pessoa escreveu', () => {
+  assert.equal(Model.smartCase('ana maria souza'), 'Ana Maria Souza');
+  assert.equal(Model.smartCase('maria da silva dos santos'), 'Maria da Silva dos Santos');
+  assert.equal(Model.smartCase('João'), 'João');
+  assert.equal(Model.smartCase('MARIA'), 'MARIA');
+  assert.equal(Model.smartCase('McDonald'), 'McDonald');
+  assert.equal(Model.smartCase(''), '');
+  assert.equal(Model.smartPlace('santos, sp'), 'Santos, SP');
+  assert.equal(Model.smartPlace('Santos, sp'), 'Santos, SP');
+  assert.equal(Model.smartPlace('são paulo'), 'São Paulo');
+  assert.equal(Model.smartPlace('Santos, SP'), 'Santos, SP');
+});
+
+test('sanitize: arruma nomes em minúsculas que já estavam salvos', () => {
+  const tree = Model.sanitize({ ownerId: 'a', people: { a: { id: 'a', firstName: 'ana', lastName: 'de souza lima', birthPlace: 'recife, pe' } } });
+  assert.equal(tree.people.a.firstName, 'Ana');
+  assert.equal(tree.people.a.lastName, 'De Souza Lima');
+  assert.equal(tree.people.a.birthPlace, 'Recife, PE');
+});
+
+test('frontier: quem ainda não tem pais cadastrados, do mais próximo ao mais distante', () => {
+  const tree = Model.emptyTree();
+  const eu = Model.createPerson(tree, { firstName: 'Eu', gender: 'F' });
+  assert.deepEqual(Model.frontier(tree).map((f) => [f.person.id, f.generation, f.missing]), [[eu.id, 0, 2]]);
+  const pai = Model.addParent(tree, eu.id, { fields: { firstName: 'Pai', gender: 'M' } });
+  const mae = Model.addParent(tree, eu.id, { fields: { firstName: 'Mãe', gender: 'F' } });
+  assert.deepEqual(Model.frontier(tree).map((f) => [f.person.firstName, f.generation, f.missing]), [['Pai', 1, 2], ['Mãe', 1, 2]]);
+  Model.addParent(tree, pai.id, { fields: { firstName: 'Avô', gender: 'M' } });
+  const rows = Model.frontier(tree).map((f) => [f.person.firstName, f.generation, f.missing]);
+  assert.deepEqual(rows, [['Pai', 1, 1], ['Mãe', 1, 2], ['Avô', 2, 2]]);
+  assert.ok(mae);
+});
+
+test('pesquisa: links só para sites conhecidos, com os dados codificados na URL', () => {
+  const pessoa = { firstName: 'João', lastName: 'da Silva Sá', gender: 'M', birthDate: '1930-05-02', birthPlace: 'São Paulo, SP', deathDate: '' };
+  const pai = { firstName: 'José', lastName: 'Silva', gender: 'M' };
+  const mae = { firstName: 'Maria', lastName: 'Sá', gender: 'F' };
+  const links = Research.links(pessoa, [pai, mae]);
+  const hosts = new Set(['www.familysearch.org', 'www.findagrave.com', 'www.wikitree.com', 'antenati.cultura.gov.it', 'museudaimigracao.org.br']);
+  for (const l of links) {
+    const u = new URL(l.url);
+    assert.equal(u.protocol, 'https:');
+    assert.ok(hosts.has(u.hostname), u.hostname);
+  }
+  const fs = new URL(links.find((l) => l.id === 'familysearch').url);
+  assert.equal(fs.pathname, '/search/record/results');
+  assert.equal(fs.searchParams.get('q.givenName'), 'João');
+  assert.equal(fs.searchParams.get('q.surname'), 'da Silva Sá');
+  assert.equal(fs.searchParams.get('q.birthLikeDate.from'), '1928');
+  assert.equal(fs.searchParams.get('q.birthLikeDate.to'), '1932');
+  assert.equal(fs.searchParams.get('q.birthLikePlace'), 'São Paulo, SP');
+  assert.equal(fs.searchParams.get('q.fatherGivenName'), 'José');
+  assert.equal(fs.searchParams.get('q.motherSurname'), 'Sá');
+  assert.ok(links.find((l) => l.id === 'familysearch').url.includes('Jo%C3%A3o'), 'acentos vão codificados em UTF-8');
+  const grave = new URL(links.find((l) => l.id === 'findagrave').url);
+  assert.equal(grave.searchParams.get('lastname'), 'Sá');
+  assert.equal(grave.searchParams.get('birthyear'), '1930');
+  const wiki = links.filter((l) => l.id.startsWith('wikitree')).map((l) => new URL(l.url).pathname);
+  assert.deepEqual(wiki, ['/genealogy/SILVA', '/genealogy/SA'], 'sem partículas e sem acentos');
+});
+
+test('pesquisa: sem nome não há links; sem dados não manda parâmetros vazios nem inventa', () => {
+  assert.deepEqual(Research.links({ firstName: '', lastName: 'Silva' }, []), []);
+  const so = Research.links({ firstName: 'Ana', lastName: '' }, []);
+  const u = new URL(so.find((l) => l.id === 'familysearch').url);
+  assert.deepEqual([...u.searchParams.keys()], ['q.givenName']);
+  assert.equal(so.filter((l) => l.id.startsWith('wikitree')).length, 0);
 });

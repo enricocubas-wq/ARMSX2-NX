@@ -1,6 +1,6 @@
 (function () {
   'use strict';
-  const { Model, Gedcom, Cpf, Dates } = window.Arvore;
+  const { Model, Gedcom, Cpf, Dates, Research } = window.Arvore;
 
   const STORAGE_KEY = 'arvore-genealogica:v1';
   const MAX_FILE_BYTES = 25 * 1024 * 1024;
@@ -96,6 +96,43 @@
     renderPanel();
   }
 
+  // Quem ainda falta descobrir, e como: é o que transforma "cadastrei meus pais" em uma árvore que cresce.
+  function nextStepsHtml() {
+    const open = Model.frontier(tree);
+    if (!open.length) return '';
+    const items = open
+      .slice(0, 4)
+      .map(({ person, missing }) =>
+        '<li><button type="button" class="linklike" data-select="' + esc(person.id) + '">' + esc(Model.displayName(person)) + '</button> <span class="none">' +
+        (missing === 2 ? 'faltam os pais' : 'falta um dos pais') + '</span></li>')
+      .join('');
+    const more = open.length > 4 ? '<li class="none">e mais ' + (open.length - 4) + '…</li>' : '';
+    return (
+      '<section class="next"><h3>Próximos passos</h3>' +
+      '<p>Para a árvore crescer, descubra o nome completo (e a cidade) de quem falta abaixo. Os seus avós aparecem na sua <strong>certidão de nascimento</strong>; ou pergunte aos seus pais. Depois escolha a pessoa e use <strong>+ Pai ou mãe</strong>.</p>' +
+      '<ul>' + items + more + '</ul></section>'
+    );
+  }
+
+  function researchHtml(person) {
+    const parents = person.parentIds.map((id) => tree.people[id]).filter(Boolean);
+    const found = Research.links(person, parents);
+    if (!found.length) return '';
+    // Registros de nascimento costumam ficar fechados por cerca de um século, e quem pode estar vivo nem aparece.
+    const born = Number(Dates.year(person.birthDate));
+    const recent = !person.deathDate && (!born || born > new Date().getFullYear() - 100);
+    const note = recent
+      ? 'Registros de quem nasceu há menos de uns 100 anos (e pode estar vivo) costumam não ser públicos, então aqui é provável que nada apareça. Estas buscas rendem mais para avós, bisavós e antepassados falecidos.'
+      : 'Quanto mais dados (cidade, ano, nomes dos pais), melhor o resultado.';
+    const items = found
+      .map((l) => '<li><a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' + esc(l.label) + '</a><span class="hint">' + esc(l.hint) + '</span></li>')
+      .join('');
+    return (
+      '<section class="research"><h3>Pesquisar nas fontes abertas</h3><p class="hint">' + esc(note) + '</p><ul>' + items + '</ul>' +
+      '<p class="hint">Ao abrir um link, o nome e o ano desta pessoa vão para o site escolhido. O app não consulta nada sozinho.</p></section>'
+    );
+  }
+
   function renderPanel() {
     const person = tree.people[selectedId];
     const panel = $('#panel');
@@ -125,6 +162,7 @@
 
     panel.innerHTML =
       '<label class="jump">Ir para <select id="jump">' + jump + '</select></label>' +
+      nextStepsHtml() +
       '<h2>' + esc(Model.displayName(person)) + (tree.ownerId === person.id ? ' <span class="ap-badge inline">você</span>' : '') + '</h2>' +
       (rows.length ? '<dl>' + rows.join('') + '</dl>' : '<p class="none">Sem mais detalhes. Use "Editar" para completar.</p>') +
       '<dl class="rels">' +
@@ -141,7 +179,8 @@
       (person.parentIds.length ? '<button type="button" data-action="add-sibling">+ Irmão(ã)</button>' : '') +
       (tree.ownerId !== person.id ? '<button type="button" data-action="make-owner">Sou eu</button>' : '') +
       '<button type="button" data-action="delete" class="danger">Excluir</button>' +
-      '</div>';
+      '</div>' +
+      researchHtml(person);
   }
 
   // ---------- leitura e validação de formulários ----------
@@ -162,7 +201,7 @@
   function validatePerson(raw, ignoreId, who) {
     const errors = [];
     const fail = (name, message) => errors.push({ name, message, who });
-    const fields = { firstName: raw.firstName, lastName: raw.lastName, gender: raw.gender, birthPlace: raw.birthPlace, notes: raw.notes, birthDate: '', deathDate: '', cpf: '' };
+    const fields = { firstName: Model.smartCase(raw.firstName), lastName: Model.smartCase(raw.lastName), gender: raw.gender, birthPlace: Model.smartPlace(raw.birthPlace), notes: raw.notes, birthDate: '', deathDate: '', cpf: '' };
 
     if (!raw.firstName) fail('firstName', 'informe o nome.');
     const birth = Dates.parseBR(raw.birthDate);

@@ -218,6 +218,14 @@ label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); f
 .panel dt { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .panel dd { margin: 0; overflow-wrap: anywhere; }
 .panel .rels { padding-top: 12px; border-top: 1px solid var(--line); }
+.panel h3 { margin: 0 0 6px; font-size: 0.95rem; }
+.panel ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.panel .next { padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.panel .next p { margin: 0 0 8px; font-size: 0.9rem; }
+.panel .research { padding-top: 12px; border-top: 1px solid var(--line); }
+.panel .research a { font-weight: 600; }
+.panel .research li .hint { display: block; margin: 2px 0 0; }
+.panel .research > .hint { margin: 0 0 8px; }
 .none { color: var(--muted); font-size: 0.9rem; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 

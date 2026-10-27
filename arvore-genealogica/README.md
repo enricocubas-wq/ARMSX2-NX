@@ -57,6 +57,8 @@ Observações:
 ## O que faz
 
 - **Cadastro inicial**: você, seu pai e sua mãe. A árvore já aparece.
+- **Próximos passos e pesquisa**: o painel lista quem ainda falta descobrir e, para a pessoa escolhida, abre buscas já preenchidas nas fontes abertas.
+- **Nomes arrumados**: texto digitado todo em minúsculas (comum no celular) ganha iniciais maiúsculas, e a sigla do estado vira maiúscula (`santos, sp` vira `Santos, SP`).
 - **Crescer a árvore**: clique em uma pessoa e use *+ Pai ou mãe*, *+ Cônjuge*, *+ Filho(a)* ou *+ Irmão(ã)*. Dá para vincular alguém que já está cadastrado em vez de criar de novo (por exemplo, o mesmo avô em dois ramos).
 - **Datas parciais**: `10/04/1999`, `04/1999` ou só `1999`, porque em genealogia muitas vezes só se sabe o ano.
 - **Importar e exportar GEDCOM 5.5.1**, o formato padrão de troca entre programas de genealogia.
@@ -83,7 +85,7 @@ O GEDCOM gerado aqui foi verificado por ida e volta (exportar e importar de novo
 
 ## O que este app não faz
 
-- **Não descobre parentes sozinho.** Não existe base pública que ligue um CPF ou um nome aos pais de alguém, e certidões de nascimento e casamento não têm API aberta. A árvore é construída com o que você informa (ou importa).
+- **Não gera a árvore sozinho.** Não existe base aberta que, com o seu nome e o dos seus pais, devolva seus avós: registros de quem nasceu há menos de cerca de um século costumam ser fechados, e as fontes abertas só acham alguém quando você já tem o **nome completo e o lugar**. O CPF não ajuda (não é chave de genealogia). O app guia o caminho: mostra quem ainda falta descobrir (os avós aparecem na certidão de nascimento) e abre buscas já preenchidas em FamilySearch, Find a Grave, WikiTree, Antenati (Itália) e Museu da Imigração (SP). Ele **não consulta nada sozinho**: só quando você abre um link o nome e o ano vão para aquele site.
 - **Não junta árvores de várias pessoas.** Cada navegador tem a sua. Para comparar árvores de parentes, cada um exporta o GEDCOM e vocês juntam num programa como Gramps ou webtrees.
 - Guarda só nascimento e falecimento. Casamentos (data e local), fotos e fontes ainda não.
 
@@ -97,6 +99,7 @@ js/cpf.js         validação, formatação e máscara de CPF
 js/dates.js       datas parciais (dd/mm/aaaa, mm/aaaa, aaaa) e datas GEDCOM
 js/model.js       pessoas, vínculos, validações e conversão para o family-chart
 js/gedcom.js      exportação e importação GEDCOM
+js/research.js    links de busca nas fontes abertas
 js/app.js         interface
 vendor/           family-chart e d3
 test/             testes automatizados
