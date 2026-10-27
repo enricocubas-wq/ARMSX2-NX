@@ -13,6 +13,6 @@ Valem para qualquer sessão neste repositório.
 ## Projetos já feitos
 | projeto | onde baixar / abrir |
 |---|---|
-| Zine Maker (monta livreto de zine em PDF para imprimir em casa) | **Mac: baixar o `.dmg`** em <https://github.com/enricocubas-wq/ARMSX2-NX/releases/tag/zine-maker-latest>. Na primeira vez: botão direito no app → Abrir. Código na pasta `zine-maker/` (branch `claude/zine-maker-app-mxjdla`). |
+| Zine Maker (monta livreto de zine em PDF para imprimir em casa) | **Mac: baixar o `.dmg`** em <https://github.com/enricocubas-wq/ARMSX2-NX/releases/tag/zine-maker-latest>. Na primeira vez (macOS 15 Sequoia ou mais novo; o botão direito → Abrir NÃO funciona mais): arrastar para Aplicativos, tentar abrir, clicar OK no aviso e ir em Ajustes do Sistema → Privacidade e Segurança → rolar até Segurança → **Abrir Mesmo Assim**. Código na pasta `zine-maker/` (branch `claude/zine-maker-app-mxjdla`). |
 
 Observação: qualquer commit em `zine-maker/**` reconstrói os instaladores e recria essa página de download (o Mac pode levar 10+ minutos na fila do GitHub). Não mexa nessa pasta sem necessidade.
