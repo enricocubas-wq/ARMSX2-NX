@@ -9,6 +9,16 @@ Monta o livreto do seu zine (miolo e capa) já na ordem certa das páginas, em P
 
 > A pesquisa por trás das decisões, com o que veio de fonte e o que é estimativa, está em [`docs/PESQUISA.md`](docs/PESQUISA.md).
 
+## Instalar como programa (Windows e Mac)
+
+Baixe o instalador na página de releases do repositório, em **zine-maker-latest**:
+<https://github.com/enricocubas-wq/ARMSX2-NX/releases/tag/zine-maker-latest>
+
+- **Windows**: `.exe`, duplo clique. Se aparecer "O Windows protegeu o computador", clique em *Mais informações* e *Executar assim mesmo*.
+- **Mac**: `.dmg`, arraste para Aplicativos. Na primeira vez, clique com o botão direito no app e escolha *Abrir*.
+
+Esses avisos existem porque o app não tem assinatura paga (Windows e Apple cobram certificado). Os instaladores são gerados pelo GitHub Actions (`.github/workflows/zine-maker-installers.yml`) a partir da pasta `desktop/`, que embrulha o mesmo app num Electron. Para gerar na sua máquina: `cd desktop && npm install && npm run dist`.
+
 ## Como usar
 
 ### Opção 1: um arquivo só (melhor para mandar aos alunos)
@@ -93,6 +103,7 @@ js/sources.js         leitura de imagens e PDFs, miniaturas, EXIF
 js/exif.js            orientação EXIF de fotos de celular
 js/app.js             estado e interface
 sw.js, manifest.webmanifest, icons/    PWA (offline e instalável)
+desktop/              programa de desktop (Electron): instaladores .exe e .dmg
 tools/serve.js        servidor local
 tools/build-single.js gera dist/zine-maker.html
 tests/                testes

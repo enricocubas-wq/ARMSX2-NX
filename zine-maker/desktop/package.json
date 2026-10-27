@@ -1,0 +1,77 @@
+{
+  "name": "zine-maker-desktop",
+  "productName": "Zine Maker",
+  "version": "1.0.0",
+  "description": "Zine Maker: monta o livreto do seu zine, pronto para imprimir em casa.",
+  "author": "Zine Maker",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "prepare-app": "node scripts/prepare.js",
+    "start": "npm run prepare-app && electron .",
+    "dist": "npm run prepare-app && electron-builder --publish never",
+    "dist:win": "npm run prepare-app && electron-builder --win --publish never",
+    "dist:mac": "npm run prepare-app && electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.9.2",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "br.zinemaker.app",
+    "productName": "Zine Maker",
+    "copyright": "Zine Maker",
+    "directories": {
+      "output": "out",
+      "buildResources": "resources"
+    },
+    "files": [
+      "main.js",
+      "app/**"
+    ],
+    "artifactName": "Zine-Maker-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Zine Maker",
+      "deleteAppDataOnUninstall": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.graphics-design",
+      "identity": null
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Graphics"
+    },
+    "publish": null,
+    "afterPack": "scripts/adhoc-sign.js"
+  }
+}

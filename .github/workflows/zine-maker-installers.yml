@@ -1,0 +1,101 @@
+name: Zine Maker installers
+
+# Gera o instalador do Zine Maker para Windows (.exe) e Mac (.dmg) e publica numa
+# pré-release chamada "zine-maker-latest" (não vira o "último release" do emulador).
+on:
+  push:
+    branches:
+      - master
+      - claude/zine-maker-app-mxjdla
+    paths:
+      - 'zine-maker/**'
+      - '.github/workflows/zine-maker-installers.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zine-maker-installers
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, name: Windows, script: 'dist:win', artifact: 'zine-maker-windows', pattern: 'zine-maker/desktop/out/*.exe' }
+          - { os: macos-latest, name: Mac, script: 'dist:mac', artifact: 'zine-maker-mac', pattern: 'zine-maker/desktop/out/*.dmg' }
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Unit tests (logic only)
+        working-directory: zine-maker
+        run: node --test tests/core.test.js
+
+      - name: Install
+        working-directory: zine-maker/desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build installer
+        working-directory: zine-maker/desktop
+        run: npm run ${{ matrix.script }}
+
+      - name: Check macOS signature
+        if: runner.os == 'macOS'
+        working-directory: zine-maker/desktop
+        run: |
+          ls out
+          codesign -dvv "out/mac-universal/Zine Maker.app" 2>&1 | head -20
+          codesign --verify --deep --strict "out/mac-universal/Zine Maker.app"
+          lipo -archs "out/mac-universal/Zine Maker.app/Contents/MacOS/Zine Maker"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+
+  release:
+    name: Publish download page
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v5
+        with:
+          path: installers
+          merge-multiple: true
+
+      - name: Publish pre-release
+        run: |
+          ls -la installers
+          cat > notes.md <<'NOTES'
+          ## Zine Maker: instaladores
+
+          **Windows:** baixe o arquivo `.exe` e dê duplo clique. Se aparecer "O Windows protegeu o computador", clique em **Mais informações** e depois em **Executar assim mesmo**.
+
+          **Mac:** baixe o arquivo `.dmg`, abra e arraste o Zine Maker para Aplicativos. Na primeira vez, **clique com o botão direito no app e escolha Abrir** (depois, **Abrir** de novo na janela de aviso). Nas próximas vezes abre normalmente.
+
+          O app roda 100% no seu computador, sem internet, e nenhum arquivo seu é enviado a lugar nenhum.
+
+          Esses avisos aparecem porque o app não tem assinatura paga (Windows e Apple cobram certificado). Não indicam problema no arquivo.
+          NOTES
+          gh release delete zine-maker-latest --cleanup-tag --yes || true
+          gh release create zine-maker-latest installers/* \
+            --prerelease --latest=false \
+            --target "$GITHUB_SHA" \
+            --title "Zine Maker (instaladores para Windows e Mac)" \
+            --notes-file notes.md
