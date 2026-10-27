@@ -12,6 +12,21 @@ Dê dois cliques em `index.html`. Se preferir servir por HTTP:
 npm start        # http://localhost:8080
 ```
 
+## Usar no celular (link + instalar como app)
+
+O app é um PWA: abre por um link e pode ser instalado na tela inicial, com ícone próprio, tela cheia e funcionamento **sem internet**.
+
+**Publicar (uma vez só):** o workflow `.github/workflows/arvore-genealogica-pages.yml` publica a pasta na branch `gh-pages` a cada alteração. Falta só ligar o GitHub Pages: no repositório, **Settings > Pages > Build and deployment > Source: "Deploy from a branch" > Branch: `gh-pages` / `(root)` > Save**. O link fica em `https://<usuário>.github.io/<repositório>/`.
+
+**Instalar:**
+- Android (Chrome): menu ⋮ > **Instalar app** (ou *Adicionar à tela inicial*).
+- iPhone (Safari): botão de compartilhar > **Adicionar à Tela de Início**.
+
+Observações:
+- Os dados ficam no navegador do aparelho. Abrir o link em outro aparelho (ou no computador) começa vazio: use **Backup** e **Importar** para levar a árvore de um para outro.
+- Os dados ficam guardados por *endereço do site*. Em `usuario.github.io`, outros sites seus no GitHub Pages compartilham o mesmo armazenamento. Se isso importar, use um domínio próprio para o app.
+- Atualizações: o app abre com a versão guardada e baixa a nova em segundo plano, então a versão nova aparece na abertura seguinte.
+
 ## O que faz
 
 - **Cadastro inicial**: você, seu pai e sua mãe. A árvore já aparece.
@@ -49,6 +64,7 @@ O GEDCOM gerado aqui foi verificado por ida e volta (exportar e importar de novo
 
 ```
 index.html        página única
+manifest.webmanifest, sw.js, icons/   instalação no celular e uso offline (PWA)
 css/app.css       visual (claro/escuro)
 js/cpf.js         validação, formatação e máscara de CPF
 js/dates.js       datas parciais (dd/mm/aaaa, mm/aaaa, aaaa) e datas GEDCOM

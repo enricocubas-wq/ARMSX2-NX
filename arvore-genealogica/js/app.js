@@ -442,4 +442,9 @@
   });
 
   render();
+
+  // Uso offline e instalação no celular. Só funciona em http(s), nunca ao abrir o arquivo direto.
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* sem service worker o app continua funcionando online */ });
+  }
 })();

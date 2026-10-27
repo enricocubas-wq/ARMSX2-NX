@@ -1,0 +1,48 @@
+name: Publicar árvore genealógica (GitHub Pages)
+
+# Publica a pasta arvore-genealogica/ na branch gh-pages.
+# Ative uma vez em Settings > Pages > "Deploy from a branch" > gh-pages / (root).
+
+on:
+  push:
+    branches:
+      - master
+      - claude/genealogy-app-registration-1h13hr
+    paths:
+      - 'arvore-genealogica/**'
+      - '.github/workflows/arvore-genealogica-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: arvore-genealogica-pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout of code
+        uses: actions/checkout@v5
+
+      - name: Rodar os testes
+        working-directory: arvore-genealogica
+        run: npm test
+
+      - name: Montar o site (só o que o navegador precisa)
+        run: |
+          cp -r arvore-genealogica "$RUNNER_TEMP/site"
+          rm -rf "$RUNNER_TEMP/site/test" "$RUNNER_TEMP/site/package.json" "$RUNNER_TEMP/site/README.md"
+          touch "$RUNNER_TEMP/site/.nojekyll"
+
+      - name: Publicar na branch gh-pages
+        working-directory: ${{ runner.temp }}/site
+        run: |
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publicar ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
