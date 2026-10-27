@@ -342,6 +342,11 @@
   // ---------- importar e exportar ----------
 
   function download(filename, text, type) {
+    // Dentro do APK não existe download do navegador: o app nativo abre o "Salvar como" do Android.
+    if (window.AndroidApp && window.AndroidApp.saveFile) {
+      window.AndroidApp.saveFile(filename, type, text);
+      return;
+    }
     const url = URL.createObjectURL(new Blob([text], { type }));
     const link = document.createElement('a');
     link.href = url;
@@ -444,7 +449,7 @@
   render();
 
   // Uso offline e instalação no celular. Só funciona em http(s), nunca ao abrir o arquivo direto.
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.AndroidApp) {
     navigator.serviceWorker.register('sw.js').catch(() => { /* sem service worker o app continua funcionando online */ });
   }
 })();

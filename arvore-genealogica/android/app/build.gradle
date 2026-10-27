@@ -1,0 +1,49 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'br.com.arvoregenealogica'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'br.com.arvoregenealogica'
+        minSdk 24
+        targetSdk 34
+        // O CI passa o número da execução, para cada APK novo poder atualizar o anterior.
+        versionCode (project.findProperty('appVersionCode') ?: '1').toInteger()
+        versionName '1.0'
+    }
+
+    signingConfigs {
+        release {
+            // Chave criada e guardada em cache pelo CI (veja .github/workflows/arvore-genealogica-apk.yml).
+            storeFile file(System.getenv('ARVORE_KEYSTORE') ?: 'sem-chave.keystore')
+            storePassword System.getenv('ARVORE_KEYSTORE_PASSWORD')
+            keyAlias 'arvore'
+            keyPassword System.getenv('ARVORE_KEYSTORE_PASSWORD')
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    // WebViewAssetLoader: serve os arquivos embutidos por https://appassets.androidplatform.net
+    implementation 'androidx.webkit:webkit:1.11.0'
+}

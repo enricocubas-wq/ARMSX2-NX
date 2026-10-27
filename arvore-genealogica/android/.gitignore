@@ -1,0 +1,7 @@
+# O app web é copiado para cá por sync-web.sh
+app/src/main/assets/www/
+build/
+.gradle/
+local.properties
+*.keystore
+*.jks
