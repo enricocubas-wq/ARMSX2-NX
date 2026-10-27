@@ -1,0 +1,10 @@
+{
+  "name": "arvore-genealogica",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Árvore genealógica local (sem servidor), com importação e exportação GEDCOM",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "start": "python3 -m http.server 8080"
+  }
+}

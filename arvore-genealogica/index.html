@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Nada sai desta página: sem rede (connect-src 'none') e só scripts do próprio app. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Minha Árvore Genealógica</title>
+  <link rel="stylesheet" href="vendor/family-chart.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>Minha árvore genealógica</h1>
+    <nav id="toolbar" class="toolbar" hidden aria-label="Arquivo">
+      <button type="button" data-cmd="import">Importar</button>
+      <button type="button" data-cmd="export-gedcom">Exportar GEDCOM</button>
+      <button type="button" data-cmd="export-json">Backup</button>
+      <button type="button" data-cmd="wipe" class="danger">Apagar tudo</button>
+    </nav>
+    <input id="fileInput" type="file" accept=".ged,.gedcom,.json,application/json,text/plain" hidden>
+  </header>
+
+  <p id="status" class="status" role="status" aria-live="polite" hidden></p>
+
+  <main>
+    <section id="welcome" class="welcome" hidden>
+      <div class="welcome-intro">
+        <h2>Comece pelos seus dados</h2>
+        <p>Cadastre você e seus pais. A árvore é montada na hora, e dá para ir adicionando avós, irmãos, cônjuge e filhos depois.</p>
+        <p class="privacy">Tudo fica salvo só neste navegador. Esta página não envia nada para a internet, nem o CPF.</p>
+        <p><button type="button" class="ghost" data-cmd="import">Já tenho um arquivo GEDCOM ou backup</button></p>
+      </div>
+
+      <form id="welcomeForm" class="welcome-form" novalidate autocomplete="off">
+        <fieldset>
+          <legend>Você</legend>
+          <div class="grid">
+            <label>Nome <input name="me_firstName" required autocomplete="given-name"></label>
+            <label>Sobrenome <input name="me_lastName" autocomplete="family-name"></label>
+            <fieldset class="radios"><legend>Sexo</legend>
+              <label><input type="radio" name="me_gender" value="F"> Feminino</label>
+              <label><input type="radio" name="me_gender" value="M"> Masculino</label>
+              <label><input type="radio" name="me_gender" value="" checked> Não informar</label>
+            </fieldset>
+            <label>Data de nascimento <input name="me_birthDate" inputmode="numeric" placeholder="dd/mm/aaaa" autocomplete="bday"></label>
+            <label>Local de nascimento <input name="me_birthPlace" placeholder="Cidade, UF"></label>
+            <label><span>CPF <span class="optional">(opcional)</span></span> <input name="me_cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
+          </div>
+          <p class="hint">O CPF não é necessário para montar a árvore e nunca aparece nos cartões nem no arquivo GEDCOM, a menos que você peça.</p>
+        </fieldset>
+
+        <fieldset>
+          <legend>Seu pai</legend>
+          <div class="grid">
+            <label>Nome <input name="father_firstName"></label>
+            <label>Sobrenome <input name="father_lastName"></label>
+            <label>Data de nascimento <input name="father_birthDate" inputmode="numeric" placeholder="dd/mm/aaaa ou só o ano"></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Sua mãe</legend>
+          <div class="grid">
+            <label>Nome <input name="mother_firstName"></label>
+            <label>Sobrenome <input name="mother_lastName"></label>
+            <label>Data de nascimento <input name="mother_birthDate" inputmode="numeric" placeholder="dd/mm/aaaa ou só o ano"></label>
+          </div>
+        </fieldset>
+
+        <p id="welcomeError" class="form-error" role="alert" hidden></p>
+        <button type="submit" class="primary">Criar minha árvore</button>
+      </form>
+    </section>
+
+    <section id="workspace" class="workspace" hidden>
+      <div class="chart-wrap">
+        <div id="chart" class="f3"></div>
+        <p class="chart-hint">Arraste para mover, use a roda do mouse (ou dois dedos) para ampliar. Clique em uma pessoa para ver os detalhes.</p>
+      </div>
+      <aside id="panel" class="panel" aria-live="polite"></aside>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Árvore desenhada com <a href="https://github.com/donatso/family-chart" rel="noreferrer">family-chart</a> (MIT) e
+    <a href="https://d3js.org" rel="noreferrer">d3</a> (ISC). Troca de dados no formato GEDCOM 5.5.1.
+  </footer>
+
+  <dialog id="personDialog">
+    <form id="personForm" method="dialog" novalidate autocomplete="off">
+      <h2 id="personTitle"></h2>
+
+      <div id="existingBox" class="existing" hidden>
+        <label>Já está cadastrado(a)? Vincule em vez de criar de novo
+          <select id="existingSelect"></select>
+        </label>
+      </div>
+
+      <div id="personFields">
+        <div class="grid">
+          <label>Nome <input name="firstName" required></label>
+          <label>Sobrenome <input name="lastName"></label>
+          <fieldset class="radios"><legend>Sexo</legend>
+            <label><input type="radio" name="gender" value="F"> Feminino</label>
+            <label><input type="radio" name="gender" value="M"> Masculino</label>
+            <label><input type="radio" name="gender" value="" checked> Não informado</label>
+          </fieldset>
+          <label>Data de nascimento <input name="birthDate" inputmode="numeric" placeholder="dd/mm/aaaa ou só o ano"></label>
+          <label>Local de nascimento <input name="birthPlace" placeholder="Cidade, UF"></label>
+          <label>Data de falecimento <input name="deathDate" inputmode="numeric" placeholder="dd/mm/aaaa ou só o ano"></label>
+          <label><span>CPF <span class="optional">(opcional)</span></span> <input name="cpf" inputmode="numeric" maxlength="14" placeholder="000.000.000-00"></label>
+        </div>
+        <label>Observações <textarea name="notes" rows="3"></textarea></label>
+      </div>
+
+      <div id="otherParentBox" class="existing" hidden>
+        <label>Outro pai/mãe da criança
+          <select id="otherParentSelect"></select>
+        </label>
+      </div>
+
+      <p id="personError" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="ghost" data-close>Cancelar</button>
+        <button type="submit" class="primary" id="personSubmit">Salvar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="exportDialog">
+    <form method="dialog" id="exportForm">
+      <h2>Exportar GEDCOM</h2>
+      <p>O GEDCOM é o formato padrão de genealogia. Dá para abrir no Gramps, webtrees, Topola Viewer, MyHeritage, Ancestry e outros.</p>
+      <label class="check"><input type="checkbox" name="includeCpf"> Incluir o CPF das pessoas no arquivo</label>
+      <p class="hint">Deixe desmarcado se for compartilhar o arquivo com outras pessoas ou enviar para algum site. Os dados dos seus parentes também são dados pessoais: compartilhe com cuidado.</p>
+      <div class="dialog-actions">
+        <button type="button" class="ghost" data-close>Cancelar</button>
+        <button type="submit" class="primary">Baixar .ged</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="vendor/d3.min.js"></script>
+  <script src="vendor/family-chart.min.js"></script>
+  <script src="js/cpf.js"></script>
+  <script src="js/dates.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/gedcom.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
