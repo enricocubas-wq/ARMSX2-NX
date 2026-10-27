@@ -6,6 +6,8 @@ COMO ABRIR
    Não abra o index.html de dentro do .zip: ele precisa dos outros arquivos ao lado.
 2. Dê dois cliques em "index.html". Ele abre no seu navegador (Chrome, Edge ou Firefox).
 3. Cadastre seus dados e monte a árvore.
+   A versão aparece no rodapé da página ("Versão 1.5 ..."). Se estiver diferente da que você
+   baixou por último, você está abrindo uma pasta antiga: apague-a e extraia o .zip de novo.
 
 SOBRE OS DADOS
 - Ficam só no navegador deste computador. Nada é enviado para a internet.

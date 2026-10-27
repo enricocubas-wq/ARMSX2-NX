@@ -2,6 +2,8 @@
   'use strict';
   const { Model, Gedcom, Cpf, Dates, Research } = window.Arvore;
 
+  // Aparece no rodapé: é como se confere qual versão está aberta (aumente a cada entrega).
+  const APP_VERSION = '1.5 · 27/10/2026 · com Próximos passos e pesquisa';
   const STORAGE_KEY = 'arvore-genealogica:v1';
   const MAX_FILE_BYTES = 25 * 1024 * 1024;
 
@@ -561,6 +563,7 @@
     }
   });
 
+  $('#appVersion').textContent = 'Versão ' + APP_VERSION;
   render();
 
   // Uso offline e instalação no celular. Só funciona em http(s), nunca ao abrir o arquivo direto.
