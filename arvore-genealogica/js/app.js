@@ -80,7 +80,8 @@
       .setCardXSpacing(230)
       .setCardYSpacing(130)
       .setOrientationVertical()
-      .setShowSiblingsOfMain(true);
+      .setShowSiblingsOfMain(true)
+      .setSingleParentEmptyCard(false); // sem cartão fantasma quando só um dos pais está cadastrado
     chart.setCardHtml().setCardInnerHtmlCreator(cardHtml).setOnCardClick((event, d) => select(d.data.id));
     chart.updateMainId(selectedId);
     chart.updateTree({ initial: true, tree_position: 'fit' });
@@ -340,7 +341,7 @@
 
   // ---------- ações do painel ----------
 
-  function onPanelAction(action) {
+  async function onPanelAction(action) {
     const person = tree.people[selectedId];
     if (action === 'toggle-cpf') {
       revealCpf = !revealCpf;
@@ -351,7 +352,7 @@
       render();
     } else if (action === 'delete') {
       const message = 'Excluir ' + Model.displayName(person) + '? Os vínculos com os parentes serão desfeitos, mas os parentes continuam cadastrados.';
-      if (!window.confirm(message)) return;
+      if (!(await confirmDialog(message, 'Excluir'))) return;
       Model.removePerson(tree, person.id);
       selectedId = tree.ownerId;
       saveTree();
@@ -361,13 +362,40 @@
     }
   }
 
+  // Confirmação dentro da própria página: window.confirm() não funciona em WebView nem em páginas embutidas.
+  function confirmDialog(message, okLabel) {
+    const dialog = $('#confirmDialog');
+    $('#confirmText').textContent = message;
+    $('#confirmOk').textContent = okLabel || 'Continuar';
+    dialog.returnValue = '';
+    return new Promise((resolve) => {
+      dialog.addEventListener('close', () => resolve(dialog.returnValue === 'yes'), { once: true });
+      dialog.showModal();
+    });
+  }
+
   // ---------- importar e exportar ----------
 
-  function download(filename, text, type) {
+  // Devolve o nome com que o arquivo foi oferecido, ou null se a pessoa recusou.
+  async function download(filename, text, type) {
     // Dentro do APK não existe download do navegador: o app nativo abre o "Salvar como" do Android.
     if (window.AndroidApp && window.AndroidApp.saveFile) {
       window.AndroidApp.saveFile(filename, type, text);
-      return;
+      return filename;
+    }
+    // Página hospedada no claude.ai: downloads por script são bloqueados, mas existe a capacidade "downloads".
+    // Ela só aceita algumas extensões (txt, json...), então .ged sai como .ged.txt.
+    const claude = window.claude;
+    const downloads = claude && typeof claude.use === 'function' ? await claude.use('downloads') : null;
+    if (downloads) {
+      const name = /\.(txt|json)$/.test(filename) ? filename : filename + '.txt';
+      try {
+        await downloads.save({ filename: name, data: text });
+        return name;
+      } catch (err) {
+        if (err && err.code === 'declined') return null;
+        throw err;
+      }
     }
     const url = URL.createObjectURL(new Blob([text], { type }));
     const link = document.createElement('a');
@@ -377,7 +405,10 @@
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return filename;
   }
+
+  const renamedHint = (asked, got) => (got !== asked ? ' Para abrir em programas de genealogia, tire o ".txt" do nome.' : '');
 
   const stamp = () => new Date().toISOString().slice(0, 10);
 
@@ -385,7 +416,7 @@
     if (!file) return;
     if (file.size > MAX_FILE_BYTES) return notify('Arquivo grande demais (limite de 25 MB).', true);
     const count = Object.keys(tree.people).length;
-    if (count && !window.confirm('Importar substitui a árvore atual (' + count + ' pessoa(s)). Para guardá-la, cancele e use "Backup" antes. Continuar?')) return;
+    if (count && !(await confirmDialog('Importar substitui a árvore atual (' + count + ' pessoa(s)). Para guardá-la, cancele e use "Backup" antes. Continuar?', 'Importar'))) return;
     try {
       const buffer = await file.arrayBuffer();
       const text = Gedcom.decode(buffer);
@@ -410,14 +441,19 @@
     }
   }
 
-  function onCommand(cmd) {
+  async function onCommand(cmd) {
     if (cmd === 'import') $('#fileInput').click();
     else if (cmd === 'export-gedcom') $('#exportDialog').showModal();
     else if (cmd === 'export-json') {
-      download('arvore-genealogica-backup-' + stamp() + '.json', JSON.stringify(tree, null, 2), 'application/json');
-      notify('Backup baixado. Ele inclui o CPF, então guarde em local seguro.');
+      const asked = 'arvore-genealogica-backup-' + stamp() + '.json';
+      try {
+        const got = await download(asked, JSON.stringify(tree, null, 2), 'application/json');
+        if (got) notify('Backup salvo. Ele inclui o CPF, então guarde em local seguro.');
+      } catch (err) {
+        notify('Não consegui salvar o backup: ' + (err && err.message ? err.message : err), true);
+      }
     } else if (cmd === 'wipe') {
-      if (!window.confirm('Apagar TODOS os dados deste navegador? Isso não pode ser desfeito. Se quiser guardar a árvore, faça o "Backup" antes.')) return;
+      if (!(await confirmDialog('Apagar TODOS os dados deste navegador? Isso não pode ser desfeito. Se quiser guardar a árvore, faça o "Backup" antes.', 'Apagar tudo'))) return;
       tree = Model.emptyTree();
       selectedId = null;
       try { localStorage.removeItem(STORAGE_KEY); } catch (err) { /* sem armazenamento, nada a apagar */ }
@@ -473,18 +509,23 @@
     event.target.value = '';
     onFileChosen(file);
   });
-  $('#exportForm').addEventListener('submit', (event) => {
+  $('#exportForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const includeCpf = event.target.elements.includeCpf.checked;
-    download('arvore-genealogica-' + stamp() + '.ged', '﻿' + Gedcom.exportGedcom(tree, { includeCpf }), 'text/plain;charset=utf-8');
     $('#exportDialog').close();
-    notify('Arquivo GEDCOM baixado' + (includeCpf ? ' (com CPF).' : ' (sem CPF).'));
+    const asked = 'arvore-genealogica-' + stamp() + '.ged';
+    try {
+      const got = await download(asked, '\uFEFF' + Gedcom.exportGedcom(tree, { includeCpf }), 'text/plain;charset=utf-8');
+      if (got) notify('Arquivo GEDCOM salvo' + (includeCpf ? ' (com CPF).' : ' (sem CPF).') + renamedHint(asked, got));
+    } catch (err) {
+      notify('Não consegui salvar o arquivo: ' + (err && err.message ? err.message : err), true);
+    }
   });
 
   render();
 
   // Uso offline e instalação no celular. Só funciona em http(s), nunca ao abrir o arquivo direto.
-  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.AndroidApp) {
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.AndroidApp && !window.claude) {
     navigator.serviceWorker.register('sw.js').catch(() => { /* sem service worker o app continua funcionando online */ });
   }
 })();
