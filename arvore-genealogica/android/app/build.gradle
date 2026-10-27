@@ -2,6 +2,9 @@ plugins {
     id 'com.android.application'
 }
 
+// O CI passa o número da execução, para cada APK novo poder atualizar o anterior.
+def appVersionCode = Integer.parseInt((project.findProperty('appVersionCode') ?: '1').toString())
+
 android {
     namespace 'br.com.arvoregenealogica'
     compileSdk 34
@@ -10,8 +13,7 @@ android {
         applicationId 'br.com.arvoregenealogica'
         minSdk 24
         targetSdk 34
-        // O CI passa o número da execução, para cada APK novo poder atualizar o anterior.
-        versionCode (project.findProperty('appVersionCode') ?: '1').toInteger()
+        versionCode = appVersionCode
         versionName '1.0'
     }
 
