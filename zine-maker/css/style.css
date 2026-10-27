@@ -72,7 +72,8 @@ body {
   background: var(--card); border: 2px solid var(--ink); border-radius: var(--radius);
   box-shadow: var(--shadow); padding: 18px 18px 20px; min-width: 0;
 }
-.card-accent { background: #fff7c2; }
+/* texto secundário em tom da mesma matiz do fundo (9:1) em vez de cinza lavado sobre o amarelo */
+.card-accent { background: #fff7c2; --muted: #4a4326; }
 .card-h { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; margin-bottom: 14px; }
 .card-h h2 { margin: 0; font: 900 18px/1.1 var(--display); text-transform: uppercase; letter-spacing: .02em; }
 .card-sub { margin: 0; flex-basis: 100%; font: 12px var(--mono); color: var(--muted); }
@@ -230,8 +231,9 @@ body.dragging-files .dropveil { display: grid; }
 .sum dd { margin: 0; }
 .sum dd b { font-family: var(--mono); }
 .msgs { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 8px; }
-.msgs li { font-size: 12.5px; line-height: 1.45; padding: 8px 10px; border-left: 4px solid var(--ink); background: rgba(23,20,15,.05); }
+.msgs li { font-size: 12.5px; line-height: 1.45; padding: 8px 10px; border: 2px solid var(--ink); border-radius: var(--radius); background: rgba(23,20,15,.04); }
 .msgs li.warn { border-color: var(--warn); background: #fff0d4; }
+.msgs li.warn::before { content: "atenção"; display: block; margin-bottom: 2px; font: 700 10px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--warn); }
 .msgs li.ok { border-color: var(--ok); }
 .cut-table { width: 100%; border-collapse: collapse; font: 12px var(--mono); margin-top: 10px; }
 .cut-table th, .cut-table td { text-align: left; padding: 4px 6px; border-bottom: 1px dashed var(--faint); }
