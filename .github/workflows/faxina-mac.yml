@@ -62,15 +62,19 @@ jobs:
           gh release upload faxina-ci-logs mac-preview-build.log shots/*.png --clobber --repo "$GITHUB_REPOSITORY" || true
 
   dmg:
-    name: DMG (${{ matrix.name }})
+    name: DMG (${{ matrix.name }}, ${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
-            name: AppleSilicon
           - os: macos-15-intel
             name: Intel
+          # Runners Apple Silicon do GitHub andam com pouca capacidade (o job pode ser cancelado por falta
+          # de máquina). Pedimos em duas versões do macOS ao mesmo tempo; a que pegar máquina primeiro publica.
+          - os: macos-15
+            name: AppleSilicon
+          - os: macos-26
+            name: AppleSilicon
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -116,7 +120,7 @@ jobs:
       - name: Guardar o DMG
         uses: actions/upload-artifact@v4
         with:
-          name: Faxina-Mac-${{ matrix.name }}
+          name: Faxina-Mac-${{ matrix.name }}-${{ matrix.os }}
           path: faxina/Faxina-Mac-${{ matrix.name }}.dmg
           if-no-files-found: error
 
