@@ -64,12 +64,14 @@ Mesmo espírito do app de celular, feito para o macOS (Apple Silicon e Intel). I
 
 > **Por que pelo Terminal?** O app não é assinado pela Apple (isso custa uma conta de desenvolvedor paga). Arquivos baixados pelo navegador ganham uma "marca de quarentena" e o macOS diz que o app "está danificado". Baixando pelo `curl` essa marca não é criada. Se você baixou pelo navegador, depois de arrastar para Aplicativos rode:
 > `xattr -cr /Applications/Faxina.app`
+> (Mac com chip Apple também roda o instalador *Intel* pelo Rosetta, mas o *AppleSilicon* é bem mais rápido.)
 > ou abra **Ajustes do Sistema › Privacidade e Segurança** e toque em **Abrir Mesmo Assim**.
 
 ### Permissões (importante)
 
 - Na primeira análise o macOS pergunta se o Faxina pode acessar **Mesa**, **Documentos** e **Downloads**. Aceite.
 - Para ver a **Lixeira**, o **Mail** e os caches protegidos, ative o Faxina em **Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco** e abra o app de novo. O próprio app avisa quando falta.
+- O macOS também pode perguntar se o Faxina pode acessar **dados de outros apps** (é onde ficam os caches deles). Aceite para vê-los na limpeza.
 - Ao esvaziar a Lixeira, o macOS pede permissão para o Faxina controlar o **Finder**.
 - Como o app não é assinado, o macOS pode pedir essas permissões de novo depois de uma atualização.
 

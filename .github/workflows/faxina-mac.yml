@@ -120,6 +120,17 @@ jobs:
           path: faxina/Faxina-Mac-${{ matrix.name }}.dmg
           if-no-files-found: error
 
+      - name: Publicar na Release "faxina-mac-latest"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NOTES="Escolha o arquivo certo: **Faxina-Mac-AppleSilicon.dmg** (chip M1/M2/M3/M4) ou **Faxina-Mac-Intel.dmg** (processador Intel). Veja faxina/README.md para instalar. Último build: commit ${GITHUB_SHA::7} em $(date -u +'%d/%m/%Y %H:%M') UTC."
+          gh release view faxina-mac-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create faxina-mac-latest --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
+              --title "Faxina para Mac — instaladores mais recentes" --notes "$NOTES" || true
+          gh release upload faxina-mac-latest "Faxina-Mac-${{ matrix.name }}.dmg" --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit faxina-mac-latest --repo "$GITHUB_REPOSITORY" --notes "$NOTES" || true
+
       - name: Publicar log do build
         if: always()
         env:
@@ -132,28 +143,3 @@ jobs:
           cp dmg-build.log "mac-${{ matrix.name }}-build.log" || true
           cp smoke.log "mac-${{ matrix.name }}-smoke.log" || true
           gh release upload faxina-ci-logs mac-${{ matrix.name }}-*.log --clobber --repo "$GITHUB_REPOSITORY" || true
-
-  publish:
-    name: Publicar na Release
-    needs: dmg
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: Faxina-Mac-*
-          merge-multiple: true
-          path: dist
-      - name: Release "faxina-mac-latest"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ls -l dist
-          test -n "$(ls dist/*.dmg 2>/dev/null)" || { echo "nenhum DMG para publicar"; exit 1; }
-          gh release delete faxina-mac-latest --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-          gh release create faxina-mac-latest dist/*.dmg \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --prerelease \
-            --title "Faxina para Mac — instaladores mais recentes" \
-            --notes "Escolha o arquivo certo: **Faxina-Mac-AppleSilicon.dmg** (chip M1/M2/M3/M4) ou **Faxina-Mac-Intel.dmg** (processador Intel). Veja faxina/README.md para instalar. Compilado do commit ${GITHUB_SHA::7} em $(date -u +'%d/%m/%Y %H:%M') UTC."

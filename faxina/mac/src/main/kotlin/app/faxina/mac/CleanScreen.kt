@@ -282,6 +282,16 @@ private fun GroupDetail(c: MacController, g: MacGroup, sel: SelStats) {
     }
 }
 
+private val GENERIC_NAMES = setOf("cache", "caches", "logs", "code cache", "gpucache", "cachestorage", "cacheddata", "shadercache", "grshadercache", "dawncache", "backup", "data", "tmp", "temp")
+
+/** "Cache" sozinho não diz nada: mostra "Slack › Cache". */
+private fun displayName(e: FileEntry): String {
+    val n = e.name
+    if (n.lowercase() !in GENERIC_NAMES) return n
+    val parent = e.parent.substringAfterLast('/')
+    return if (parent.isNotEmpty()) "$parent › $n" else n
+}
+
 @Composable
 fun EntryRow(entry: FileEntry, checked: Boolean, onToggle: () -> Unit) {
     Row(
@@ -291,7 +301,7 @@ fun EntryRow(entry: FileEntry, checked: Boolean, onToggle: () -> Unit) {
         FileThumb(entry.path, size = 46.dp, isDir = entry.isDir)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(entry.name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(displayName(entry), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(prettyPath(entry.parent), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(

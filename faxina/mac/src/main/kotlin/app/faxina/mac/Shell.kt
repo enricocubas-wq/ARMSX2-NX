@@ -200,7 +200,14 @@ private fun Sidebar(c: MacController, modifier: Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 8.dp),
             )
+            Spacer(Modifier.height(4.dp))
         }
+        Text(
+            "Faxina para Mac 1.0",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
     }
 }
 

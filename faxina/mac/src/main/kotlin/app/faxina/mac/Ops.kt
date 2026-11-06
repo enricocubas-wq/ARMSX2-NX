@@ -132,6 +132,9 @@ object Keychain {
         if (!Ops.isMac) return false
         val cmd = "add-generic-password -U -a ${q(account)} -s ${q(SERVICE)} -w ${q(secret)}\n"
         Ops.run("security", "-i", input = cmd)
+        if (get(account) == secret) return true
+        // plano B: o comando direto (a senha fica visível por instantes na lista de processos do seu usuário)
+        Ops.run("security", "add-generic-password", "-U", "-a", account, "-s", SERVICE, "-w", secret)
         return get(account) == secret
     }
 
