@@ -41,6 +41,8 @@ fun main() {
     duplicateTests(h)
     println("E-mail: IMAP")
     imapTests(h)
+    println("Mac: limpeza e apps")
+    macTests(h)
     println("\n${h.passed} ok, ${h.failures} falhas")
     if (h.failures > 0) exitProcess(1)
 }

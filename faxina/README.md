@@ -44,6 +44,53 @@ A senha fica cifrada com uma chave do Android Keystore e só é usada para falar
 - **Pastas `Android/data`** de outros apps ficam bloqueadas no Android 11+; por isso não aparecem na limpeza (o cache delas entra pelo botão acima).
 - Apagar é **definitivo** (não vai para a lixeira). Por isso sempre há uma lista e uma confirmação antes.
 
+## Faxina para Mac
+
+Mesmo espírito do app de celular, feito para o macOS (Apple Silicon e Intel). Interface com barra lateral, leitura da sua pasta pessoal em paralelo e as mesmas ferramentas de duplicados e e-mail.
+
+### Como instalar
+
+1. Descubra o seu Mac: menu  › **Sobre Este Mac**. Se aparecer **Chip Apple M1/M2/M3/M4**, use o arquivo *AppleSilicon*; se aparecer **Processador Intel**, use o *Intel*.
+2. Abra o **Terminal** (⌘+Espaço, digite *Terminal*), cole **uma** das linhas abaixo e aperte Enter. Ela baixa o instalador e abre a janela do DMG:
+
+   ```bash
+   # Mac com chip Apple (M1, M2, M3, M4)
+   curl -L -o ~/Downloads/Faxina-Mac.dmg https://github.com/enricocubas-wq/ARMSX2-NX/releases/download/faxina-mac-latest/Faxina-Mac-AppleSilicon.dmg && open ~/Downloads/Faxina-Mac.dmg
+
+   # Mac com processador Intel
+   curl -L -o ~/Downloads/Faxina-Mac.dmg https://github.com/enricocubas-wq/ARMSX2-NX/releases/download/faxina-mac-latest/Faxina-Mac-Intel.dmg && open ~/Downloads/Faxina-Mac.dmg
+   ```
+3. Arraste o **Faxina** para **Aplicativos** e abra.
+
+> **Por que pelo Terminal?** O app não é assinado pela Apple (isso custa uma conta de desenvolvedor paga). Arquivos baixados pelo navegador ganham uma "marca de quarentena" e o macOS diz que o app "está danificado". Baixando pelo `curl` essa marca não é criada. Se você baixou pelo navegador, depois de arrastar para Aplicativos rode:
+> `xattr -cr /Applications/Faxina.app`
+> ou abra **Ajustes do Sistema › Privacidade e Segurança** e toque em **Abrir Mesmo Assim**.
+
+### Permissões (importante)
+
+- Na primeira análise o macOS pergunta se o Faxina pode acessar **Mesa**, **Documentos** e **Downloads**. Aceite.
+- Para ver a **Lixeira**, o **Mail** e os caches protegidos, ative o Faxina em **Ajustes do Sistema › Privacidade e Segurança › Acesso Total ao Disco** e abra o app de novo. O próprio app avisa quando falta.
+- Ao esvaziar a Lixeira, o macOS pede permissão para o Faxina controlar o **Finder**.
+- Como o app não é assinado, o macOS pode pedir essas permissões de novo depois de uma atualização.
+
+### O que ele limpa no Mac
+
+| Gaveta | O que é |
+|---|---|
+| **Cache de apps** (seguro) | `~/Library/Caches` (menos os da Apple) e caches de apps Electron/Chromium (Slack, VS Code, Chrome...) |
+| **Logs e relatórios de erro** (seguro) | `~/Library/Logs`, relatórios de travamento |
+| **Cache de desenvolvimento** (seguro) | Xcode DerivedData, Homebrew, npm, pip, CocoaPods |
+| **Anexos do Mail**, **temporários**, **Lixeira** (seguro) | cópias de anexos, `.tmp`/downloads incompletos/`__MACOSX`, itens que você já jogou fora |
+| **Duplicados** | mesmo conteúdo byte a byte; ignora a biblioteca do Fotos, `node_modules` e arquivos que ainda estão só no iCloud |
+| **Arquivos grandes** | acima de 100 MB, pelo tamanho **real** no disco (discos de máquina virtual e arquivos do iCloud na nuvem não enganam) |
+| **Instaladores, capturas de tela, downloads antigos** | `.dmg`/`.pkg`, prints da Mesa, Downloads com mais de 90 dias |
+| **Desenvolvimento pesado, backups de iPhone** | simuladores, DeviceSupport, Gradle/Maven, backups do Finder |
+| **Apps** | tamanho, último uso e **desinstalação com os restos** da Biblioteca (vai para a Lixeira) |
+| **Pastas** | raio-x em árvore; pastas importantes do início ficam protegidas contra seleção |
+| **E-mail** | igual ao celular; a senha de app fica no **Keychain** do macOS |
+
+Itens "confira antes" vão para a **Lixeira** por padrão (dá para desfazer); o botão da barra inferior troca para apagar na hora. O espaço só volta depois de esvaziar a Lixeira, e o app oferece esse botão no fim.
+
 ## O que foi (e não foi) testado
 
 - **Testado automaticamente a cada build (29 verificações):** varredura e regras de lixo, WhatsApp/Telegram, pastas vazias, duplicados
@@ -57,12 +104,14 @@ A senha fica cifrada com uma chave do Android Keystore e só é usada para falar
 
 ```bash
 cd faxina
-./gradlew :core:selfTest        # testes do núcleo (varredura, duplicados, IMAP contra servidor falso)
+./gradlew :core:selfTest        # testes do núcleo (varredura, duplicados, regras do Mac, IMAP contra servidor falso)
 ./gradlew :app:assembleRelease  # APK em app/build/outputs/apk/release/
 ```
 
 - `core/` — Kotlin puro (sem Android): varredura paralela com `java.nio`, regras de lixo, duplicados, cliente IMAP próprio.
-- `app/` — Jetpack Compose (Material 3), ViewModels, permissões, apps instalados, tela de e-mail.
+- `app/` — Jetpack Compose (Material 3), ViewModels, permissões, apps instalados, tela de e-mail (Android).
+- `mac/` — Compose Desktop (Material 3) para macOS: mesmo núcleo, regras próprias do Mac, Lixeira, Keychain.
+  `./gradlew :mac:previewShots -PshotsDir=...` gera PNGs das telas com dados de mentira.
 - Assinatura: `app/faxina.jks` é uma chave **pessoal e pública** só para manter a assinatura estável entre versões.
   Se for publicar o app em loja, gere a sua e guarde fora do repositório.
 - O workflow `.github/workflows/faxina-apk.yml` compila e publica o APK sozinho a cada push em `faxina/`.

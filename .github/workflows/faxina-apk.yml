@@ -7,6 +7,7 @@ on:
   push:
     paths:
       - 'faxina/**'
+      - '!faxina/mac/**'
       - '.github/workflows/faxina-apk.yml'
   workflow_dispatch:
 

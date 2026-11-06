@@ -24,3 +24,4 @@ rootProject.name = "Faxina"
 
 include(":core")
 include(":app")
+include(":mac")
