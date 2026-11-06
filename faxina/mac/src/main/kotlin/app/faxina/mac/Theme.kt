@@ -1,12 +1,15 @@
 package app.faxina.mac
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -97,6 +100,13 @@ fun FaxinaTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -
     MaterialTheme(
         colorScheme = if (dark) Dark else Light,
         typography = Type,
-        content = content,
-    )
+    ) {
+        // Sem uma superfície base, Text e Icon usam preto por padrão (ilegível no tema escuro).
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+            content = content,
+        )
+    }
 }

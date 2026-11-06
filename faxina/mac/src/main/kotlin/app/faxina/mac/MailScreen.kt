@@ -80,11 +80,13 @@ fun MailScreen(vm: MailController) {
                     IconButton(onClick = { vm.signOut() }) { Icon(Icons.AutoMirrored.Rounded.Logout, "Sair da conta") }
                 }
             }
-            when (val s = ui) {
-                MailUi.NoAccount -> MailSetup(vm)
-                is MailUi.Working -> MailWorking(s)
-                is MailUi.Failed -> MailFailed(s, vm)
-                is MailUi.Ready -> MailReady(s.report, vm)
+            Box(Modifier.fillMaxSize().padding(horizontal = 8.dp)) {
+                when (val s = ui) {
+                    MailUi.NoAccount -> MailSetup(vm)
+                    is MailUi.Working -> MailWorking(s)
+                    is MailUi.Failed -> MailFailed(s, vm)
+                    is MailUi.Ready -> MailReady(s.report, vm)
+                }
             }
         }
     }
