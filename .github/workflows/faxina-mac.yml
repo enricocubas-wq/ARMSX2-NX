@@ -10,6 +10,7 @@ on:
       - 'faxina/**'
       - '!faxina/app/**'
       - '.github/workflows/faxina-mac.yml'
+      - '.github/workflows/faxina-mac-dmg.yml'
   workflow_dispatch:
 
 permissions:
@@ -61,89 +62,58 @@ jobs:
           cp preview-build.log mac-preview-build.log || true
           gh release upload faxina-ci-logs mac-preview-build.log shots/*.png --clobber --repo "$GITHUB_REPOSITORY" || true
 
-  dmg:
-    name: DMG (${{ matrix.name }}, ${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-15-intel
-            name: Intel
-          # Runners Apple Silicon do GitHub andam com pouca capacidade (o job pode ser cancelado por falta
-          # de máquina). Pedimos em duas versões do macOS ao mesmo tempo; a que pegar máquina primeiro publica.
-          - os: macos-15
-            name: AppleSilicon
-          - os: macos-26
-            name: AppleSilicon
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        working-directory: faxina
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          validate-wrappers: false
+  intel:
+    name: DMG Intel
+    uses: ./.github/workflows/faxina-mac-dmg.yml
+    with:
+      name: Intel
+      os: macos-15-intel
 
-      - name: Empacotar o app
-        run: |
-          set -o pipefail
-          ./gradlew :mac:createDistributable --stacktrace 2>&1 | tee ../dmg-build.log
+  # Os runners Apple Silicon do GitHub andam com pouca capacidade: o job pode ser cancelado por falta de
+  # máquina. Tentamos em até 3 rodadas (macos-15 e macos-26 ao mesmo tempo); parou de tentar quando uma der certo.
+  arm1a:
+    name: DMG Apple Silicon (rodada 1, macos-15)
+    uses: ./.github/workflows/faxina-mac-dmg.yml
+    with:
+      name: AppleSilicon
+      os: macos-15
+  arm1b:
+    name: DMG Apple Silicon (rodada 1, macos-26)
+    uses: ./.github/workflows/faxina-mac-dmg.yml
+    with:
+      name: AppleSilicon
+      os: macos-26
 
-      - name: Assinar (ad-hoc) e criar o DMG
-        run: |
-          APP=$(find mac/build/compose/binaries -maxdepth 5 -name 'Faxina.app' | head -n 1)
-          test -n "$APP" || { echo "Faxina.app não encontrado"; exit 1; }
-          echo "App: $APP"
-          codesign --force --deep --sign - "$APP"
-          codesign --verify --deep --strict --verbose=2 "$APP"
-          rm -rf dmgroot && mkdir dmgroot
-          cp -R "$APP" dmgroot/
-          ln -s /Applications dmgroot/Applications
-          hdiutil create -volname "Faxina" -srcfolder dmgroot -ov -format UDZO "Faxina-Mac-${{ matrix.name }}.dmg"
-          ls -l Faxina-Mac-*.dmg
-          echo "APP_PATH=$APP" >> "$GITHUB_ENV"
+  arm2a:
+    name: DMG Apple Silicon (rodada 2, macos-15)
+    needs: [arm1a, arm1b]
+    if: ${{ !cancelled() && needs.arm1a.result != 'success' && needs.arm1b.result != 'success' }}
+    uses: ./.github/workflows/faxina-mac-dmg.yml
+    with:
+      name: AppleSilicon
+      os: macos-15
+  arm2b:
+    name: DMG Apple Silicon (rodada 2, macos-26)
+    needs: [arm1a, arm1b]
+    if: ${{ !cancelled() && needs.arm1a.result != 'success' && needs.arm1b.result != 'success' }}
+    uses: ./.github/workflows/faxina-mac-dmg.yml
+    with:
+      name: AppleSilicon
+      os: macos-26
 
-      - name: Teste de fumaça (abre o app por 15 s)
-        continue-on-error: true
-        run: |
-          "$APP_PATH/Contents/MacOS/Faxina" > ../smoke.log 2>&1 &
-          PID=$!
-          sleep 15
-          if kill -0 $PID 2>/dev/null; then echo "App continua rodando: OK"; kill $PID; else echo "O app fechou sozinho!"; cat ../smoke.log; exit 1; fi
-          cat ../smoke.log
-
-      - name: Guardar o DMG
-        uses: actions/upload-artifact@v4
-        with:
-          name: Faxina-Mac-${{ matrix.name }}-${{ matrix.os }}
-          path: faxina/Faxina-Mac-${{ matrix.name }}.dmg
-          if-no-files-found: error
-
-      - name: Publicar na Release "faxina-mac-latest"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          NOTES="Escolha o arquivo certo: **Faxina-Mac-AppleSilicon.dmg** (chip M1/M2/M3/M4) ou **Faxina-Mac-Intel.dmg** (processador Intel). Veja faxina/README.md para instalar. Último build: commit ${GITHUB_SHA::7} em $(date -u +'%d/%m/%Y %H:%M') UTC."
-          gh release view faxina-mac-latest --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create faxina-mac-latest --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-              --title "Faxina para Mac — instaladores mais recentes" --notes "$NOTES" || true
-          gh release upload faxina-mac-latest "Faxina-Mac-${{ matrix.name }}.dmg" --clobber --repo "$GITHUB_REPOSITORY"
-          gh release edit faxina-mac-latest --repo "$GITHUB_REPOSITORY" --notes "$NOTES" || true
-
-      - name: Publicar log do build
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          gh release view faxina-ci-logs --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create faxina-ci-logs --repo "$GITHUB_REPOSITORY" --prerelease \
-              --title "Registros do CI (temporário)" --notes "Prévias de tela e logs de build. Pode ser apagado."
-          cp dmg-build.log "mac-${{ matrix.name }}-build.log" || true
-          cp smoke.log "mac-${{ matrix.name }}-smoke.log" || true
-          gh release upload faxina-ci-logs mac-${{ matrix.name }}-*.log --clobber --repo "$GITHUB_REPOSITORY" || true
+  arm3a:
+    name: DMG Apple Silicon (rodada 3, macos-15)
+    needs: [arm1a, arm1b, arm2a, arm2b]
+    if: ${{ !cancelled() && needs.arm1a.result != 'success' && needs.arm1b.result != 'success' && needs.arm2a.result != 'success' && needs.arm2b.result != 'success' }}
+    uses: ./.github/workflows/faxina-mac-dmg.yml
+    with:
+      name: AppleSilicon
+      os: macos-15
+  arm3b:
+    name: DMG Apple Silicon (rodada 3, macos-26)
+    needs: [arm1a, arm1b, arm2a, arm2b]
+    if: ${{ !cancelled() && needs.arm1a.result != 'success' && needs.arm1b.result != 'success' && needs.arm2a.result != 'success' && needs.arm2b.result != 'success' }}
+    uses: ./.github/workflows/faxina-mac-dmg.yml
+    with:
+      name: AppleSilicon
+      os: macos-26
