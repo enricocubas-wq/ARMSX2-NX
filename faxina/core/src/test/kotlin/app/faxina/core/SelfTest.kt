@@ -214,6 +214,29 @@ private fun duplicateTests(h: Harness) {
             expectEq(setOf("a.bin", "c.bin"), r.groups[0].map { it.name }.toSet(), "membros")
         } finally { dir.deleteRecursively() }
     }
+    h.test("apagar só o conteúdo mantém a pasta (caches de apps com contêiner)") {
+        val dir = Files.createTempDirectory("faxina-co").toFile()
+        try {
+            dir.write("Caches/a/b.bin", bytes(70, 5_000))
+            dir.write("Caches/c.bin", bytes(71, 3_000))
+            val caches = File(dir, "Caches")
+            val r = Deleter.delete(listOf(FileEntry(caches.path, 8_000, 0, isDir = true, contentsOnly = true)))
+            expect(caches.isDirectory) { "a pasta Caches tinha que continuar existindo" }
+            expectEq(0, caches.listFiles()!!.size, "conteúdo")
+            expectEq(8_000L, r.freedBytes, "liberado")
+        } finally { dir.deleteRecursively() }
+    }
+    h.test("duplicados: muitos arquivos do mesmo tamanho em paralelo") {
+        val dir = Files.createTempDirectory("faxina-par").toFile()
+        try {
+            val same = bytes(80, 200_000)
+            val files = (0 until 40).map { i -> dir.write("f$i.bin", if (i % 4 == 0) same else bytes(100L + i, 200_000)) }
+            val cands = mapOf(200_000L to files.map { FileEntry(it.path, it.length(), it.lastModified()) })
+            val r = Duplicates.find(cands, threads = 4)
+            expectEq(1, r.groups.size, "conjuntos")
+            expectEq(10, r.groups[0].size, "cópias idênticas")
+        } finally { dir.deleteRecursively() }
+    }
     h.test("pontuação de cópia original") {
         val ordered = Duplicates.orderKeeperFirst(
             listOf(

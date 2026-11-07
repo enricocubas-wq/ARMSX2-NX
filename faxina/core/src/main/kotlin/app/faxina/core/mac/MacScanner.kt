@@ -86,7 +86,8 @@ class MacScanner(private val opts: MacScanOptions, val progress: ScanProgress = 
             if (c.name.startsWith("com.apple.")) return@forEach
             val cache = c.children.firstOrNull { it.name == "Data" }?.children?.firstOrNull { it.name == "Library" }
                 ?.children?.firstOrNull { it.name == "Caches" }
-            if (cache != null && cache.size >= MIN_CACHE_BYTES) queues.getValue(MacGroupId.APP_CACHES).add(entryOf(cache))
+            // A pasta Caches faz parte do contêiner do app: apagamos só o que tem dentro.
+            if (cache != null && cache.size >= MIN_CACHE_BYTES) queues.getValue(MacGroupId.APP_CACHES).add(entryOf(cache).copy(contentsOnly = true))
         }
 
         // --- logs e relatórios de erro
@@ -100,7 +101,7 @@ class MacScanner(private val opts: MacScanOptions, val progress: ScanProgress = 
 
         // --- anexos baixados do Mail
         node("Library/Containers/com.apple.mail/Data/Library/Mail Downloads")?.let {
-            if (it.size >= MIN_DIR_BYTES) queues.getValue(MacGroupId.MAIL_DOWNLOADS).add(entryOf(it))
+            if (it.size >= MIN_DIR_BYTES) queues.getValue(MacGroupId.MAIL_DOWNLOADS).add(entryOf(it).copy(contentsOnly = true))
         }
 
         // --- backups de iPhone/iPad

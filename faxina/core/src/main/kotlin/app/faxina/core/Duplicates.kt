@@ -30,42 +30,40 @@ object Duplicates {
         progress?.phase = ScanProgress.Phase.DUPLICATES
         val pool = Executors.newFixedThreadPool(threads.coerceIn(1, 6))
         try {
-            // Maiores primeiro: o usuário vê os ganhos grandes logo no início.
-            val sizes = candidates.keys.sortedDescending()
-            val out = ArrayList<List<FileEntry>>()
-            for (batch in sizes.chunked(threads * 4)) {
-                if (cancel.cancelled) break
-                val jobs = batch.map { size -> Callable { identicalSets(candidates.getValue(size), progress, cancel) } }
-                for (f in pool.invokeAll(jobs)) out.addAll(f.get())
-            }
-            out.sortByDescending { it.first().size * (it.size - 1) }
-            return Result(out)
+            // Etapa 2: amostra de cada arquivo, em paralelo (maiores primeiro).
+            val all = candidates.keys.sortedDescending().flatMap { candidates.getValue(it) }
+            val sampled = hashAll(pool, all, cancel) { f -> sampleHash(File(f.path), f.size) }
+            val suspects = sampled.groupBy({ it.first.size to it.second }, { it.first }).values.filter { it.size >= 2 }.flatten()
+            if (cancel.cancelled) return Result(emptyList())
+
+            // Etapa 3: arquivo inteiro, também em paralelo, só para quem empatou na amostra.
+            val full = hashAll(pool, suspects, cancel) { f -> fullHash(File(f.path), progress, cancel) }
+            val out = full.groupBy({ it.first.size to it.second }, { it.first }).values
+                .filter { it.size >= 2 }
+                .map { orderKeeperFirst(it) }
+                .sortedByDescending { it.first().size * (it.size - 1) }
+            return Result(if (cancel.cancelled) emptyList() else out)
         } finally {
             pool.shutdownNow()
         }
     }
 
-    private fun identicalSets(files: List<FileEntry>, progress: ScanProgress?, cancel: CancelToken): List<List<FileEntry>> {
-        // Etapa 2: amostra
-        val bySample = LinkedHashMap<String, MutableList<FileEntry>>()
-        for (f in files) {
-            if (cancel.cancelled) return emptyList()
-            val key = try { sampleHash(File(f.path), f.size) } catch (_: Exception) { continue }
-            bySample.getOrPut(key) { ArrayList() }.add(f)
-        }
-        // Etapa 3: arquivo inteiro
-        val result = ArrayList<List<FileEntry>>()
-        for (same in bySample.values) {
-            if (same.size < 2) continue
-            val byFull = LinkedHashMap<String, MutableList<FileEntry>>()
-            for (f in same) {
-                if (cancel.cancelled) return emptyList()
-                val key = try { fullHash(File(f.path), progress, cancel) } catch (_: Exception) { continue }
-                byFull.getOrPut(key) { ArrayList() }.add(f)
+    /** Calcula [hash] para cada arquivo em paralelo; arquivos ilegíveis ficam de fora. */
+    private fun hashAll(
+        pool: java.util.concurrent.ExecutorService,
+        files: List<FileEntry>,
+        cancel: CancelToken,
+        hash: (FileEntry) -> String,
+    ): List<Pair<FileEntry, String>> {
+        if (files.isEmpty()) return emptyList()
+        val jobs = files.chunked(16).map { chunk ->
+            Callable {
+                chunk.mapNotNull { f ->
+                    if (cancel.cancelled) null else try { f to hash(f) } catch (_: Exception) { null }
+                }
             }
-            for (g in byFull.values) if (g.size >= 2) result.add(orderKeeperFirst(g))
         }
-        return result
+        return pool.invokeAll(jobs).flatMap { runCatching { it.get() }.getOrDefault(emptyList()) }
     }
 
     private fun sampleHash(file: File, size: Long): String {

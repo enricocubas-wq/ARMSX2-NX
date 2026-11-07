@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.DeleteForever
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.faxina.core.DirNode
 import app.faxina.core.FileEntry
+import app.faxina.core.findDirNode
 import app.faxina.core.formatBytes
 import app.faxina.data.Openers
 import app.faxina.data.StorageInfo
@@ -50,13 +52,18 @@ import app.faxina.vm.Screen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private fun findNode(roots: List<DirNode>, path: String): DirNode? {
-    var list = roots
-    while (true) {
-        val n = list.firstOrNull { path == it.path || path.startsWith(it.path + "/") } ?: return null
-        if (n.path == path) return n
-        list = n.children
-    }
+/** Pastas-raiz que o Faxina nunca deixa marcar no explorador: apagar uma delas seria um desastre. */
+private val PROTECTED_TOP = setOf(
+    "android", "dcim", "download", "downloads", "pictures", "movies", "music", "documents", "podcasts",
+    "audiobooks", "recordings", "ringtones", "alarms", "notifications", "whatsapp", "telegram",
+)
+
+private fun isProtected(path: String, roots: List<DirNode>): Boolean {
+    if (roots.any { it.path == path }) return true
+    val parent = path.substringBeforeLast('/', "")
+    if (roots.none { it.path == parent }) return false
+    val name = path.substringAfterLast('/')
+    return name.lowercase() in PROTECTED_TOP || name.startsWith(".")
 }
 
 @Composable
@@ -68,7 +75,7 @@ fun ExplorerScreen(vm: MainViewModel, path: String) {
     var selected by remember(path) { mutableStateOf(setOf<String>()) }
     var confirm by remember { mutableStateOf(false) }
 
-    val node = remember(tree, path, version) { if (path.isEmpty()) null else findNode(tree, path) }
+    val node = remember(tree, path, version) { if (path.isEmpty()) null else findDirNode(tree, path) }
     val dirs: List<DirNode> = if (path.isEmpty()) tree else node?.children ?: emptyList()
     val files by produceState(emptyList<FileEntry>(), path, version) {
         value = if (path.isEmpty()) emptyList() else withContext(Dispatchers.IO) { vm.childFilesOf(path) }
@@ -152,7 +159,9 @@ fun ExplorerScreen(vm: MainViewModel, path: String) {
                                 )
                             }
                         }
-                        if (path.isNotEmpty()) {
+                        if (path.isNotEmpty() && isProtected(e.path, tree)) {
+                            Icon(Icons.Rounded.Lock, "Pasta protegida", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 12.dp))
+                        } else if (path.isNotEmpty()) {
                             Checkbox(
                                 checked = e.path in selected,
                                 onCheckedChange = { on -> selected = if (on) selected + e.path else selected - e.path },

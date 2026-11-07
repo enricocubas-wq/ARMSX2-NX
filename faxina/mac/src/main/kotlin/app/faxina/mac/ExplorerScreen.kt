@@ -52,7 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.faxina.core.FileEntry
 import app.faxina.core.formatBytes
-import app.faxina.core.mac.findDirNode
+import app.faxina.core.findDirNode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

@@ -6,7 +6,7 @@ import app.faxina.core.mac.MacGroupId
 import app.faxina.core.mac.MacScanOptions
 import app.faxina.core.mac.MacScanner
 import app.faxina.core.mac.PhysicalSize
-import app.faxina.core.mac.findDirNode
+import app.faxina.core.findDirNode
 import java.io.File
 import java.nio.file.Files
 import java.util.Random

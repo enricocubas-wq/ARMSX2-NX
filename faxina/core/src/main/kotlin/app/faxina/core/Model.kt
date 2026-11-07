@@ -44,6 +44,8 @@ data class FileEntry(
     val isDir: Boolean = false,
     val setId: Int = -1,
     val keep: Boolean = false,
+    /** Pasta que o sistema espera que exista: apaga só o que está dentro dela. */
+    val contentsOnly: Boolean = false,
 ) {
     val name: String get() = path.substringAfterLast('/')
     val parent: String get() = path.substringBeforeLast('/', "")

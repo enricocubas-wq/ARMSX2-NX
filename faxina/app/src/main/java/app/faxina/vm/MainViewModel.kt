@@ -10,6 +10,7 @@ import app.faxina.core.DeleteResult
 import app.faxina.core.Deleter
 import app.faxina.core.DirNode
 import app.faxina.core.Duplicates
+import app.faxina.core.removeFromTree
 import app.faxina.core.FileCategory
 import app.faxina.core.FileEntry
 import app.faxina.core.GroupId
@@ -384,24 +385,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun dropFinishedSets(items: List<FileEntry>): List<FileEntry> {
         val live = items.groupBy { it.setId }.filter { (_, v) -> v.size >= 2 }.keys
         return items.filter { it.setId in live }
-    }
-
-    private fun removeFromTree(roots: List<DirNode>, path: String, size: Long) {
-        for (r in roots) {
-            if (!path.startsWith(r.path + "/")) continue
-            var node = r
-            node.size = (node.size - size).coerceAtLeast(0)
-            while (true) {
-                val child = node.children.firstOrNull { path == it.path || path.startsWith(it.path + "/") } ?: break
-                if (child.path == path) {
-                    node.children.remove(child)
-                    break
-                }
-                child.size = (child.size - size).coerceAtLeast(0)
-                node = child
-            }
-            return
-        }
     }
 
     // ------------------------------------------------------------ apps

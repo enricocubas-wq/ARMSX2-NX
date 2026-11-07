@@ -1,9 +1,8 @@
 package app.faxina.mac
 
 import app.faxina.core.CancelToken
-import app.faxina.core.DirNode
+import app.faxina.core.removeFromTree
 import app.faxina.core.Deleter
-import app.faxina.core.FileCategory
 import app.faxina.core.FileEntry
 import app.faxina.core.Risk
 import app.faxina.core.ScanProgress
@@ -14,7 +13,6 @@ import app.faxina.core.mac.MacGroupId
 import app.faxina.core.mac.MacScanOptions
 import app.faxina.core.mac.MacScanResult
 import app.faxina.core.mac.MacScanner
-import app.faxina.core.formatBytes
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -229,7 +227,8 @@ class MacController(private val scope: CoroutineScope) {
 
     private fun defaultSelection(groups: List<MacGroup>): Set<String> {
         val out = HashSet<String>()
-        for (g in groups) if (g.risk == Risk.SAFE) g.items.forEach { out.add(it.path) }
+        // A Lixeira fica de fora: o que está lá pode ser algo que a pessoa ainda quer recuperar.
+        for (g in groups) if (g.risk == Risk.SAFE && g.id != MacGroupId.TRASH) g.items.forEach { out.add(it.path) }
         return out
     }
 
@@ -342,13 +341,14 @@ class MacController(private val scope: CoroutineScope) {
         for (p in planned) {
             val e = p.entry
             val ok = if (p.permanent) {
-                Deleter.delete(listOf(e)).deleted.isNotEmpty()
+                val r = Deleter.delete(listOf(e))
+                freed += r.freedBytes
+                r.deleted.isNotEmpty()
             } else {
-                Ops.moveToTrash(File(e.path))
+                Ops.moveToTrash(File(e.path)).also { moved -> if (moved) inTrash += e.size }
             }
             if (ok) {
                 gone.add(e.path)
-                if (p.permanent) freed += e.size else inTrash += e.size
             } else if (e.path.startsWith(trashPrefix)) {
                 failedTrashItems.add(p)
             }
@@ -371,7 +371,7 @@ class MacController(private val scope: CoroutineScope) {
 
     private fun applyRemoval(requested: List<Planned>, gone: Set<String>) {
         val res = _result.value
-        if (res != null) for (p in requested) if (p.entry.path in gone) removeFromTree(res.tree, p.entry.path, p.entry.size)
+        if (res != null) for (p in requested) if (p.entry.path in gone) removeFromTree(listOf(res.tree), p.entry.path, p.entry.size)
         val under = requested.filter { it.entry.isDir && it.entry.path in gone }.map { it.entry.path + "/" }
         _groups.value = _groups.value.mapNotNull { g ->
             var items = g.items.filter { it.path !in gone && under.none { d -> it.path.startsWith(d) } }
@@ -385,21 +385,6 @@ class MacController(private val scope: CoroutineScope) {
         _treeVersion.update { it + 1 }
         val active = _active.value
         if (active != null && _groups.value.none { it.id == active }) _active.value = _groups.value.maxByOrNull { it.bytes }?.id
-    }
-
-    private fun removeFromTree(root: DirNode, path: String, size: Long) {
-        if (!path.startsWith(root.path + "/")) return
-        var node = root
-        node.size = (node.size - size).coerceAtLeast(0)
-        while (true) {
-            val child = node.children.firstOrNull { path == it.path || path.startsWith(it.path + "/") } ?: break
-            if (child.path == path) {
-                node.children.remove(child)
-                break
-            }
-            child.size = (child.size - size).coerceAtLeast(0)
-            node = child
-        }
     }
 
     private fun addLifetime(bytes: Long) {
@@ -472,16 +457,13 @@ class MacController(private val scope: CoroutineScope) {
     // ------------------------------------------------------------ início
     init {
         startScan()
-        scope.launch {
-            while (isActive) {
+        scope.launch(Dispatchers.IO) {
+            // Só faz sentido vigiar enquanto falta o acesso (depois de dado, o macOS pede para reabrir o app).
+            while (isActive && _fda.value == false) {
                 delay(2500)
                 val now = Ops.hasFullDiskAccess()
                 if (now != _fda.value) _fda.value = now
             }
         }
     }
-
-    fun categoryBytes(cat: FileCategory): Long = _result.value?.bytesByCategory?.get(cat) ?: 0L
-
-    fun describe(b: Long) = formatBytes(b)
 }

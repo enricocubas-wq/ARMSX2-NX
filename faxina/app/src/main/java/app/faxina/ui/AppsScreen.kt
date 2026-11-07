@@ -1,6 +1,10 @@
 package app.faxina.ui
 
+import android.app.Activity
 import android.content.Intent
+import android.os.storage.StorageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -78,6 +82,12 @@ fun AppsScreen(vm: MainViewModel) {
     val apps by vm.apps.collectAsStateWithLifecycle()
     val ctx = LocalContext.current
     var sort by remember { mutableStateOf(AppSort.SIZE) }
+    val clearCache = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode == Activity.RESULT_OK) {
+            Toast.makeText(ctx, "Cache dos apps limpo", Toast.LENGTH_SHORT).show()
+            vm.loadApps()
+        }
+    }
 
     // carrega ao abrir e de novo ao voltar das configurações do sistema (permissão, desinstalação, cache)
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.loadApps() }
@@ -123,8 +133,13 @@ fun AppsScreen(vm: MainViewModel) {
                                     text = "Limpar cache dos apps",
                                     height = 52.dp,
                                     onClick = {
-                                        if (!Openers.clearAllAppCache(ctx)) {
-                                            Toast.makeText(ctx, "Seu celular não tem esse atalho. Abra um app da lista e toque em Limpar cache.", Toast.LENGTH_LONG).show()
+                                        // O sistema só aceita esse pedido via startActivityForResult (precisa saber quem pediu).
+                                        try {
+                                            clearCache.launch(Intent(StorageManager.ACTION_CLEAR_APP_CACHE))
+                                        } catch (_: Exception) {
+                                            if (!Openers.openManageStorage(ctx)) {
+                                                Toast.makeText(ctx, "Seu celular não tem esse atalho. Abra um app da lista e toque em Limpar cache.", Toast.LENGTH_LONG).show()
+                                            }
                                         }
                                     },
                                 )

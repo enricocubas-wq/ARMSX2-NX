@@ -18,14 +18,42 @@ object Deleter {
         val bad = ArrayList<String>()
         var i = 0
         for (e in entries) {
+            val path = File(e.path).toPath()
             val success = try {
-                if (e.isDir) deleteTree(File(e.path).toPath()) else Files.deleteIfExists(File(e.path).toPath()).let { true }
+                when {
+                    e.isDir && e.contentsOnly -> deleteContents(path)
+                    e.isDir -> deleteTree(path)
+                    else -> Files.deleteIfExists(path).let { true }
+                }
             } catch (_: Exception) { false }
-            if (success) { freed += e.size; ok.add(e.path) } else bad.add(e.path)
+            if (success) {
+                freed += e.size
+                ok.add(e.path)
+            } else {
+                // Algo dentro estava em uso: conta o que saiu de fato.
+                if (e.isDir) freed += (e.size - sizeOf(path)).coerceAtLeast(0)
+                bad.add(e.path)
+            }
             onProgress?.invoke(++i, entries.size)
         }
         return DeleteResult(freed, ok, bad)
     }
+
+    private fun deleteContents(dir: Path): Boolean {
+        if (!Files.isDirectory(dir, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return true
+        var allOk = true
+        Files.newDirectoryStream(dir).use { st -> for (child in st) if (!deleteTree(child)) allOk = false }
+        return allOk
+    }
+
+    /** Bytes que ainda restam em [p] (0 se sumiu). */
+    private fun sizeOf(p: Path): Long = try {
+        if (!Files.exists(p, java.nio.file.LinkOption.NOFOLLOW_LINKS)) 0L
+        else Files.walk(p).use { st ->
+            st.filter { Files.isRegularFile(it, java.nio.file.LinkOption.NOFOLLOW_LINKS) }
+                .mapToLong { runCatching { Files.size(it) }.getOrDefault(0L) }.sum()
+        }
+    } catch (_: Exception) { 0L }
 
     private fun deleteTree(root: Path): Boolean {
         if (!Files.exists(root, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return true

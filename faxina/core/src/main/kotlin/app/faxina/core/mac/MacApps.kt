@@ -1,7 +1,6 @@
 package app.faxina.core.mac
 
 import app.faxina.core.CancelToken
-import app.faxina.core.DirNode
 import app.faxina.core.FileEntry
 import java.io.File
 import java.time.OffsetDateTime
@@ -107,21 +106,5 @@ object MacApps {
         return existing.map { f ->
             FileEntry(f.path, sizes[f.path] ?: if (f.isFile) f.length() else 0L, f.lastModified(), isDir = f.isDirectory)
         }.filter { it.size > 0 }.sortedByDescending { it.size }
-    }
-
-    /** Não deixa o "Faxina" apagar apps do próprio sistema por engano. */
-    fun isSafeToRemove(app: MacApp): Boolean =
-        app.path.startsWith("/Applications/") || app.path.contains("/Applications/") && !app.path.startsWith("/System/")
-}
-
-/** Utilitário para o explorador: acha a pasta pelo caminho completo. */
-fun findDirNode(root: DirNode, path: String): DirNode? {
-    if (path == root.path) return root
-    if (!path.startsWith(root.path + "/")) return null
-    var cur = root
-    while (true) {
-        val next = cur.children.firstOrNull { path == it.path || path.startsWith(it.path + "/") } ?: return null
-        if (next.path == path) return next
-        cur = next
     }
 }

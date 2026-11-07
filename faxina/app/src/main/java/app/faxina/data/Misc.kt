@@ -81,20 +81,12 @@ object Openers {
         }
     }
 
-    /** Tenta o botão "limpar cache de todos os apps" do sistema. Devolve false se este celular não tem. */
-    fun clearAllAppCache(ctx: Context): Boolean {
-        val intents = listOf(
-            Intent(StorageManager.ACTION_CLEAR_APP_CACHE),
-            Intent(StorageManager.ACTION_MANAGE_STORAGE),
-        )
-        for (i in intents) {
-            try {
-                ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                return true
-            } catch (_: Exception) {
-            }
-        }
-        return false
+    /** Tela "gerenciar armazenamento" do sistema (alternativa quando não há o botão de limpar cache). */
+    fun openManageStorage(ctx: Context): Boolean = try {
+        ctx.startActivity(Intent(StorageManager.ACTION_MANAGE_STORAGE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (_: Exception) {
+        false
     }
 
     val sdk: Int get() = Build.VERSION.SDK_INT
